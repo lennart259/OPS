@@ -1,0 +1,156 @@
+
+*** These modified files were found in JOE when it aborted on Tue Nov  8 12:52:54 2022
+*** JOE was aborted by UNIX signal 1
+
+*** File '* Shell 4 *'
+
+Type joehelp for editor shell commands
+
+comnets@comnets-vm:~/git/OPS$ 
+*** File '/home/comnets/git/OPS/.git/COMMIT_EDITMSG'
+test commit 2
+~~
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch master
+# Your branch is up to date with 'origin/master'.
+#
+# Changes to be committed:
+#	modified:   simulations/omnetpp-ops.ini
+#
+
+*** File '(Unnamed)'
+OSG
+
+*** File '(Unnamed)'
+configure.user
+configure.user
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+.bashrc
+/home/comnets/git/OPS/.git/COMMIT_EDITMSG
+* Startup Log *
+* Shell 4 *
+* Startup Log *
+* Shell 3 *
+
+*** File '* Startup Log *'
+Processing '/etc/joe/editorrc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/editorrc
+
+*** These modified files were found in JOE when it aborted on Tue Nov  8 12:52:54 2022
+*** JOE was aborted by UNIX signal 1
+
+*** File '/home/comnets/git/OPS/.git/COMMIT_EDITMSG'
+test commit 2
+~~
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch master
+# Your branch is up to date with 'origin/master'.
+#
+# Changes to be committed:
+#	modified:   simulations/omnetpp-ops.ini
+#
+
+*** File '(Unnamed)'
+OSG
+
+*** File '(Unnamed)'
+configure.user
+configure.user
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+.bashrc
+/home/comnets/git/OPS/.git/COMMIT_EDITMSG
+* Startup Log *
+* Shell 4 *
+
+*** File '* Startup Log *'
+Processing '/etc/joe/editorrc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/editorrc
+
+*** These modified files were found in JOE when it aborted on Tue Nov  8 12:52:54 2022
+*** JOE was aborted by UNIX signal 1
+
+*** File '* Shell 3 *'
+
+Type joehelp for editor shell commands
+
+comnets@comnets-vm:~/git/OPS$ 
+comnets@comnets-vm:~/git/OPS$ 
+comnets@comnets-vm:~/git/OPS$ 
+*** File '* Shell 4 *'
+
+Type joehelp for editor shell commands
+
+comnets@comnets-vm:~/git/OPS$ exit
+exit
+
+exit*(
+exit()
+
+
+s
+s
+s
+s
+s
+
+
+d
+d
+d
+d
+
+
+
+
+*** File '/home/comnets/git/OPS/.git/COMMIT_EDITMSG'
+test commit 2
+~~
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch master
+# Your branch is up to date with 'origin/master'.
+#
+# Changes to be committed:
+#	modified:   simulations/omnetpp-ops.ini
+#
+
+*** File '(Unnamed)'
+OSG
+
+*** File '(Unnamed)'
+configure.user
+configure.user
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+.bashrc
+/home/comnets/git/OPS/.git/COMMIT_EDITMSG
+* Startup Log *
+* Shell 4 *
+* Startup Log *
+* Shell 3 *
+* Startup Log *
+* Shell 3 *
+* Startup Log *
+* Shell 4 *
+* Startup Log *
+* Shell 4 *
+* Startup Log *
+* Shell 4 *
+* Startup Log *
+* Shell 4 *
+* Startup Log *
+* Shell 4 *
+
+*** File '* Startup Log *'
+Processing '/etc/joe/editorrc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/editorrc
