@@ -33,6 +33,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         virtual int numInitStages() const;
         virtual void finish();
 
+    // todo: What is not needed for MaxProp?
     private:
         string ownMACAddress;
         int nextAppID;
@@ -55,6 +56,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
             string prefixName;
         };
 
+
+        // DATA message cache entry
         struct CacheEntry {
             string messageID;
             int hopCount;
@@ -95,6 +98,18 @@ class KMaxPropRoutingLayer : public cSimpleModule
             bool nodeConsidered;
 
         };
+
+        struct peerLikelihood {
+            string nodeMACAddress;
+            double likelihood;
+        };
+
+        struct routingInfo {
+            string nodeMACAdress;       // the node's own node ID
+            list<peerLikelihood*> peerLikelihoods; // other node ID's and path likelihoods
+        };
+        // local list holding all lists of peerLikelihoods for a respective node
+        list<routingInfo*> routingInfoList; // idk if this works
 
         list<AppInfo*> registeredAppList;
         list<CacheEntry*> cacheList;

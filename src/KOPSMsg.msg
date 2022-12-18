@@ -46,6 +46,9 @@ packet KDataMsg {
 
     // spray & wait specific fields
     int duplicates;
+    
+    // MaxProp Specific Fields
+    // TODO: hopList
 }
 
 //
