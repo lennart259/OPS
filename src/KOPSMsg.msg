@@ -105,6 +105,30 @@ packet KSummaryVectorMsg {
 }
 
 //
+// Acknowledgement message (used with MaxProp Routing).
+//
+// @author : Lennart Hinz (lennart9@uni-bremen.de)
+// @date   : 19-dec-2022
+//
+//
+// example sizes in bytes
+//
+//                addrs |   msg ID	     | total  |
+//                s & d |                | (bytes)|
+// Epidemic  ->   6 + 6        4             16 
+
+packet KAckMsg {
+
+    // common fields
+    string sourceAddress;
+    string destinationAddress;
+
+	int hopsToLive; // hops to live to delete Ack message after some hops 
+    // MaxProp specific fields
+    int msgUniqueID;  // unique message identifier
+}
+
+//
 // Data request message (used with Epidemic Routing).
 //
 // @author : Asanga Udugama (adu@comnets.uni-bremen.de)

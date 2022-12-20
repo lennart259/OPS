@@ -45,6 +45,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         int usedRNG;
         double cacheSizeReportingFrequency;
 
+        int ackHopsToLive;
+
         int numEventsHandled;
         int currentCacheSize;
 
@@ -99,21 +101,28 @@ class KMaxPropRoutingLayer : public cSimpleModule
 
         };
 
-        struct peerLikelihood {
+        struct PeerLikelihood {
             string nodeMACAddress;
             double likelihood;
         };
 
-        struct routingInfo {
+        struct RoutingInfo {
             string nodeMACAdress;       // the node's own node ID
-            list<peerLikelihood*> peerLikelihoods; // other node ID's and path likelihoods
+            list<PeerLikelihood*> peerLikelihoods; // other node ID's and path likelihoods
         };
+
+        struct AckCacheEntry{
+            int hopsToLive;
+            int msgUniqueID;
+        };
+
         // local list holding all lists of peerLikelihoods for a respective node
-        list<routingInfo*> routingInfoList; // idk if this works
+        list<RoutingInfo*> routingInfoList; // idk if this works
 
         list<AppInfo*> registeredAppList;
         list<CacheEntry*> cacheList;
         list<SyncedNeighbour*> syncedNeighbourList;
+        list<AckCacheEntry*> ackCacheList;
         bool syncedNeighbourListIHasChanged;
 
         void ageDataInCache();
@@ -123,6 +132,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void handleDataMsgFromLowerLayer(cMessage *msg);
         void handleSummaryVectorMsgFromLowerLayer(cMessage *msg);
         void handleDataRequestMsgFromLowerLayer(cMessage *msg);
+
+        void handleAckMsgFromLowerLayer(cMessage *msg);
 
         SyncedNeighbour* getSyncingNeighbourInfo(string nodeMACAddress);
         void setSyncingNeighbourInfoForNextRound();

@@ -37,6 +37,9 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
         // current cache size stat reporting frequency
         double cacheSizeReportingFrequency @unit(s) = default(100s);
 
+		// number of hops to propagate an ACK before it is deleted.
+		int ackHopsToLive = default(10);
+		
         // icon used
         @display("i=block/transport");
 

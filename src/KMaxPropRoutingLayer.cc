@@ -27,6 +27,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
         usedRNG = par("usedRNG");
         cacheSizeReportingFrequency = par("cacheSizeReportingFrequency");
         numEventsHandled = 0;
+        ackHopsToLive = par("ackHopsToLive");
 
         syncedNeighbourListIHasChanged = TRUE;
 
@@ -529,6 +530,12 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     }
     if (found) {
         send(msg, "upperLayerOut");
+        // create new ACK message and store in own cache.
+        AckCacheEntry *newAckCacheEntry = new AckCacheEntry();
+        newAckCacheEntry->msgUniqueID = omnetDataMsg->getMsgUniqueID();
+        newAckCacheEntry->hopsToLive = ackHopsToLive;
+        ackCacheList.push_back(newAckCacheEntry);
+
 
     } else {
         delete msg;
@@ -691,13 +698,80 @@ void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
                 cacheList.remove(cacheEntry);
                 delete cacheEntry;
             }
-
-
         }
 
         i++;
     }
+    delete msg;
+}
 
+// todo handleAckMsg Lennart
+void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
+{
+    KAckMsg *ackMsg = dynamic_cast<KAckMsg*>(msg);
+
+    // todo: statistic for Ack bytes
+    //emit(ackBytesReceivedSignal, (long) ackMsg->getByteLength());
+    emit(totalBytesReceivedSignal, (long) ackMsg->getByteLength());
+
+    int msgUniqueID = ackMsg->getMsgUniqueID();
+
+    // search own ACK cache, to see if this ack has been seen before (if yes, we have deleted a data entry already)
+    AckCacheEntry *ackCacheEntry;
+    list<AckCacheEntry*>::iterator iteratorAckCache;
+    bool found = FALSE;
+    iteratorAckCache = ackCacheList.begin();
+    while (iteratorAckCache != ackCacheList.end()) {
+        ackCacheEntry = *iteratorAckCache;
+        if (ackCacheEntry->msgUniqueID == msgUniqueID) {
+            found = TRUE;
+            break;
+        }
+
+        iteratorAckCache++;
+    }
+    if (!found) {
+
+        // store ACK to propagate further if TTL - 1 is > 0
+        int htl = ackMsg->getHopsToLive() - 1; // decrease hops to live
+
+        // store ack'd ID in local cache
+        if(htl > 0) {
+            AckCacheEntry *newAckCacheEntry = new AckCacheEntry();
+            newAckCacheEntry->msgUniqueID = msgUniqueID;
+            newAckCacheEntry->hopsToLive = htl;
+            ackCacheList.push_back(newAckCacheEntry);
+        }
+
+
+        // search for ack'd packet in own data cache
+        CacheEntry *cacheEntry;
+        list<CacheEntry*>::iterator iteratorCache;
+        found = FALSE;
+        iteratorCache = cacheList.begin();
+        while (iteratorCache != cacheList.end()) {
+            cacheEntry = *iteratorCache;
+            if (cacheEntry->msgUniqueID == msgUniqueID) {
+                found = TRUE;
+                break;
+            }
+
+            iteratorCache++;
+        }
+        // delete delivered (ack'd) cache entry if found
+        if (found) {
+            currentCacheSize -= cacheEntry->realPacketSize;
+
+            emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
+            emit(currentCacheSizeBytesSignal, currentCacheSize);
+            emit(currentCacheSizeReportedCountSignal, (int) 1);
+
+            emit(currentCacheSizeBytesSignal2, currentCacheSize);
+
+            cacheList.remove(cacheEntry);
+            delete cacheEntry;
+        }
+    }
     delete msg;
 }
 
