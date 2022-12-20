@@ -360,6 +360,15 @@ string KWirelessInterface::getDestinationAddress(cMessage *msg)
         return feedbackMsg->getDestinationAddress();
     }
 
+    KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
+    if (routingInfoMsg) {
+        return routingInfoMsg->getDestinationAddress();
+    }
+
+    KAckMsg *ackMsg = dynamic_cast<KAckMsg*>(msg);
+    if (ackMsg) {
+        return ackMsg->getDestinationAddress();
+    }
     KSummaryVectorMsg *summaryVectorMsg = dynamic_cast<KSummaryVectorMsg*>(msg);
     if (summaryVectorMsg) {
         return summaryVectorMsg->getDestinationAddress();

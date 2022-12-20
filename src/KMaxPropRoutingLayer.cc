@@ -136,6 +136,14 @@ void KMaxPropRoutingLayer::handleMessage(cMessage *msg)
 
             handleDataRequestMsgFromLowerLayer(msg);
 
+        } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KRoutingInfoMsg*>(msg) != NULL) {
+
+            handleRoutingInfoMsgFromLowerLayer(msg);
+
+        } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KAckMsg*>(msg) != NULL) {
+
+            handleAckMsgFromLowerLayer(msg);
+
         // received some unexpected packet
         } else {
 
@@ -303,6 +311,38 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
 
 void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 {
+
+    // todo LEN TEST
+    // generate a dummy routing info
+    string macAdresses[] = {"AAA", "BBB", "CCC"};
+    list<PeerLikelihood*> peerLikelihoodList;
+    for(int i = 0; i < 3; i++) {
+        PeerLikelihood *pL = new PeerLikelihood();
+        pL->nodeMACAddress = macAdresses[i];
+        pL->likelihood = i;
+        peerLikelihoodList.push_back(pL);
+    }
+
+
+    KRoutingInfoMsg *routingInfoMsg = new KRoutingInfoMsg();
+    routingInfoMsg->setPeerLikelihoodsArraySize(3);
+
+    list<PeerLikelihood*>::iterator iteratorPLList;
+    int i = 0;
+    iteratorPLList = peerLikelihoodList.begin();
+    while (iteratorPLList != peerLikelihoodList.end()) {
+        PeerLikelihood PL = **iteratorPLList;
+        routingInfoMsg->setPeerLikelihoods(i, PL);
+        iteratorPLList++;
+        i++;
+    }
+
+
+
+
+
+
+
     KNeighbourListMsg *neighListMsg = dynamic_cast<KNeighbourListMsg*>(msg);
 
     // if no neighbours or cache is empty, just return
@@ -319,10 +359,19 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
     }
 
     // send summary vector messages (if appropriate) to all nodes to sync in a loop
-    int i = 0;
+    i = 0;
+    EV << "neighbors: " << neighListMsg->getNeighbourNameListArraySize() << "";
     while (i < neighListMsg->getNeighbourNameListArraySize()) {
         string nodeMACAddress = neighListMsg->getNeighbourNameList(i);
 
+
+        /*// routing info message test
+        routingInfoMsg->setSourceAddress(ownMACAddress.c_str());
+        routingInfoMsg->setDestinationAddress(nodeMACAddress.c_str());
+        send(routingInfoMsg, "lowerLayerOut");
+
+        EV << "Sending routing Info to : " << nodeMACAddress.c_str() << "";
+         */
         // get syncing info of neighbor
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
 
@@ -774,6 +823,22 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     }
     delete msg;
 }
+
+void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
+    KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
+
+    int lenPL;
+    PeerLikelihood pL;
+
+    lenPL = routingInfoMsg->getPeerLikelihoodsArraySize();
+    EV << "RoutingInfo arrived at node: " << ownMACAddress << " !!!";
+    for(int i = 0; i < lenPL; i++) {
+        pL = routingInfoMsg->getPeerLikelihoods(i);
+        EV << "MAC: " << pL.nodeMACAddress << ", Likelihood: " << pL.likelihood << ".";
+    }
+    delete msg;
+}
+
 
 KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbourInfo(string nodeMACAddress)
 {

@@ -101,10 +101,12 @@ class KMaxPropRoutingLayer : public cSimpleModule
 
         };
 
+        /*
         struct PeerLikelihood {
             string nodeMACAddress;
             double likelihood;
         };
+        */
 
         struct RoutingInfo {
             string nodeMACAdress;       // the node's own node ID
@@ -134,6 +136,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void handleDataRequestMsgFromLowerLayer(cMessage *msg);
 
         void handleAckMsgFromLowerLayer(cMessage *msg);
+        void handleRoutingInfoMsgFromLowerLayer(cMessage *msg);
 
         SyncedNeighbour* getSyncingNeighbourInfo(string nodeMACAddress);
         void setSyncingNeighbourInfoForNextRound();

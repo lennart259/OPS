@@ -115,7 +115,7 @@ packet KSummaryVectorMsg {
 //
 //                addrs |   msg ID	     | total  |
 //                s & d |                | (bytes)|
-// Epidemic  ->   6 + 6        4             16 
+// MaxProp   ->   6 + 6        4             16 
 
 packet KAckMsg {
 
@@ -126,6 +126,34 @@ packet KAckMsg {
 	int hopsToLive; // hops to live to delete Ack message after some hops 
     // MaxProp specific fields
     int msgUniqueID;  // unique message identifier
+}
+
+//
+// Routing Info message (used with MaxProp Routing).
+//
+// @author : Lennart Hinz (lennart9@uni-bremen.de)
+// @date   : 19-dec-2022
+//
+//
+// example sizes in bytes
+//
+//                addrs |   msg ID	     | total  |
+//                s & d |                | (bytes)|
+// MaxProp   ->   6 + 6        4             16 
+
+struct PeerLikelihood {
+    string nodeMACAddress;
+    double likelihood;
+};
+        
+packet KRoutingInfoMsg {
+
+    // common fields
+    string sourceAddress;
+    string destinationAddress;
+
+    // MaxProp specific fields
+    PeerLikelihood peerLikelihoods[];
 }
 
 //
