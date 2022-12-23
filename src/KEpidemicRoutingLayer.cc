@@ -400,6 +400,8 @@ void KEpidemicRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 {
     KDataMsg *omnetDataMsg = dynamic_cast<KDataMsg*>(msg);
     bool found;
+    // debug
+    EV_INFO << KEPIDEMICROUTINGLAYER_SIMMODULEINFO << "Received data message" << "\n";
 
     // increment the travelled hop count
     omnetDataMsg->setHopsTravelled(omnetDataMsg->getHopsTravelled() + 1);
@@ -517,6 +519,9 @@ void KEpidemicRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     list<AppInfo*>::iterator iteratorRegisteredApps = registeredAppList.begin();
     while (iteratorRegisteredApps != registeredAppList.end()) {
         appInfo = *iteratorRegisteredApps;
+        if (omnetDataMsg->getDestinationOriented()){
+            EV_INFO << KEPIDEMICROUTINGLAYER_SIMMODULEINFO << "Received data message isDestinationOriented" << "\n";
+        }
         if (strstr(omnetDataMsg->getDataName(), appInfo->prefixName.c_str()) != NULL
                 && ((omnetDataMsg->getDestinationOriented()
                       && strstr(omnetDataMsg->getFinalDestinationAddress(), ownMACAddress.c_str()) != NULL)
@@ -540,6 +545,8 @@ void KEpidemicRoutingLayer::handleSummaryVectorMsgFromLowerLayer(cMessage *msg)
 
     emit(sumVecBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
     emit(totalBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
+    // debug
+    EV_INFO << KEPIDEMICROUTINGLAYER_SIMMODULEINFO << "Received Summary Vector message" << "\n";
 
     // when a summary vector is received, it means that the neighbour started the syncing
     // so send the data request message with the required data items
