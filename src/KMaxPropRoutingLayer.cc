@@ -830,6 +830,36 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     delete msg;
 }
 
+void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
+
+    int ackListSize = ackCacheList.size();
+
+    KAckMsg *ackMsg = new KAckMsg();
+
+    ackMsg->sourceAddress = ownMACAddress;
+    ackMsg->destinationAddress = destinationAddress;
+    ackMsg->setAckListArraySize(ackListSize);
+
+    // before sending, we reduce the ttl of all list entries by 1
+    Ack *ackCacheEntry;
+    list<Ack*>::iterator iteratorAckCache;
+    found = FALSE;
+    iteratorAckCache = ackCacheList.begin();
+    int i = 0;
+    // reduce ttl in local Cache and add local cache entry to KAckMessage
+    while (iteratorAckCache != ackCacheList.end()) {
+        ackCacheEntry = *iteratorAckCache;
+        ackCacheEntry->ttl -= 1;
+        ackMsg->setAckList(i, ackCacheEntry);
+
+        iteratorAckCache++;
+        i++;
+        //EV << "Ack cache entry: " << i << " has ttl of: " << ackCacheEntry->ttl;
+    }
+    send(ackMsg, "lowerLayerOut");
+
+}
+
 void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
 
