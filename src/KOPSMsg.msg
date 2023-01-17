@@ -117,15 +117,19 @@ packet KSummaryVectorMsg {
 //                s & d |                | (bytes)|
 // MaxProp   ->   6 + 6        4             16 
 
+struct Ack {
+    int ttl; // time to live is reduced each time, an Ack is sent out
+    int msgUniqueID;  // unique message identifier
+}
+
 packet KAckMsg {
 
     // common fields
     string sourceAddress;
     string destinationAddress;
-
-	int hopsToLive; // hops to live to delete Ack message after some hops 
+    
     // MaxProp specific fields
-    int msgUniqueID;  // unique message identifier
+    Ack ackList[];
 }
 
 //
@@ -147,7 +151,6 @@ struct PeerLikelihood {
 };
         
 packet KRoutingInfoMsg {
-
     // common fields
     string sourceAddress;
     string destinationAddress;

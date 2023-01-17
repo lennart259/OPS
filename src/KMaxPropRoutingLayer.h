@@ -45,7 +45,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         int usedRNG;
         double cacheSizeReportingFrequency;
 
-        int ackHopsToLive;
+        int ackTtl;
 
         int numEventsHandled;
         int currentCacheSize;
@@ -113,10 +113,12 @@ class KMaxPropRoutingLayer : public cSimpleModule
             list<PeerLikelihood*> peerLikelihoods; // other node ID's and path likelihoods
         };
 
+        /*
         struct AckCacheEntry{
             int hopsToLive;
             int msgUniqueID;
         };
+        */
 
         // local list holding all lists of peerLikelihoods for a respective node
         list<RoutingInfo*> routingInfoList; // idk if this works
@@ -124,7 +126,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         list<AppInfo*> registeredAppList;
         list<CacheEntry*> cacheList;
         list<SyncedNeighbour*> syncedNeighbourList;
-        list<AckCacheEntry*> ackCacheList;
+        list<Ack*> ackCacheList;
         bool syncedNeighbourListIHasChanged;
 
         void ageDataInCache();
