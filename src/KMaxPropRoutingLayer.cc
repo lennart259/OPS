@@ -16,6 +16,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
 {
     if (stage == 0) {
         // get parameters
+        totalNumNodes = getParentModule()->par("numNodes");
         ownMACAddress = par("ownMACAddress").stringValue();
         nextAppID = 1;
         maximumCacheSize = par("maximumCacheSize");
@@ -30,6 +31,16 @@ void KMaxPropRoutingLayer::initialize(int stage)
         ackTtl = par("ackTtl");
 
         syncedNeighbourListIHasChanged = TRUE;
+
+        // initialize routingInfo
+        routingInfoList.reserve(totalNumNodes); // reserve max size of vector which could hold routing info of all nodes in the NW
+
+        RoutingInfo ownRoutingInfo;
+        ownRoutingInfo.nodeMACAddress = ownMACAddress;
+        ownRoutingInfo.peerLikelihoods.reserve(totalNumNodes);
+
+        routingInfoList.push_back(ownRoutingInfo);
+
 
     } else if (stage == 1) {
 
@@ -336,11 +347,6 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
         iteratorPLList++;
         i++;
     }
-
-
-
-
-
 
 
     KNeighbourListMsg *neighListMsg = dynamic_cast<KNeighbourListMsg*>(msg);
@@ -836,21 +842,21 @@ void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
 
     KAckMsg *ackMsg = new KAckMsg();
 
-    ackMsg->sourceAddress = ownMACAddress;
-    ackMsg->destinationAddress = destinationAddress;
+    ackMsg->setSourceAddress(ownMACAddress.c_str());
+    ackMsg->setDestinationAddress(destinationAddress.c_str());
     ackMsg->setAckListArraySize(ackListSize);
 
     // before sending, we reduce the ttl of all list entries by 1
     Ack *ackCacheEntry;
     list<Ack*>::iterator iteratorAckCache;
-    found = FALSE;
+    bool found = FALSE;
     iteratorAckCache = ackCacheList.begin();
     int i = 0;
     // reduce ttl in local Cache and add local cache entry to KAckMessage
     while (iteratorAckCache != ackCacheList.end()) {
         ackCacheEntry = *iteratorAckCache;
         ackCacheEntry->ttl -= 1;
-        ackMsg->setAckList(i, ackCacheEntry);
+        ackMsg->setAckList(i, *ackCacheEntry);
 
         iteratorAckCache++;
         i++;
@@ -863,6 +869,14 @@ void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
 void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
 
+    // function:
+    // current node ("node A") receives a vector of pathLikelihoods from a known MacAddress ("node B")
+    // node A searches in his own routingInfoList, if it already has a vector from node B
+    // if yes: it replaces it, if no, it adds the new vector to the local list
+    // node A keeps his own routingInfo at position 0 of his routingInfoList.
+    // in his own routingInfo it searches for the MAC Address of node B,
+    // if it is found: add 1 to the current likelihood and divide all entries by 2
+    // if it is not found: add new entry containing 1 as likelihood, and divide all entries by 2
     int lenPL;
     PeerLikelihood pL;
 
@@ -872,6 +886,9 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
         pL = routingInfoMsg->getPeerLikelihoods(i);
         EV << "MAC: " << pL.nodeMACAddress << ", Likelihood: " << pL.likelihood << ".";
     }
+
+
+
     delete msg;
 }
 
