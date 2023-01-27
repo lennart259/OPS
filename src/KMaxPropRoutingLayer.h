@@ -141,6 +141,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void handleAckMsgFromLowerLayer(cMessage *msg);
         void handleRoutingInfoMsgFromLowerLayer(cMessage *msg);
 
+        void sendRoutingInfoMessage(string destinationAddress);
         void sendAckVectorMessage(string destinationAddress);
         SyncedNeighbour* getSyncingNeighbourInfo(string nodeMACAddress);
         void setSyncingNeighbourInfoForNextRound();
