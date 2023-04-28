@@ -441,7 +441,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             // phase 1:
             // todo send packets destined to the neighbor
             int numMsg = SendMsgDestinedToNeighbor(nodeMACAddress.c_str());
-            syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + numMsg*TimePerPacket + randomBackoffDuration;
+            syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + numMsg*TimePerPacket + maximumRandomBackoffDuration;
             syncedNeighbour->neighbourSyncing = TRUE;
             // phase 2:
             // todo send routing info and Ack messages
@@ -449,8 +449,8 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             // phase 3:
             // todo other data transfer
 
-            emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
-            emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
+            // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
+            // emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
         }
 
         i++;
@@ -1069,7 +1069,7 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
         iteratorSyncedNeighbour++;
     }
 }
-void KMaxPropRoutingLayer::SendMsgDestinedToNeighbor(string nodeMACAddress)
+int KMaxPropRoutingLayer::SendMsgDestinedToNeighbor(string nodeMACAddress)
 {
     // sends all messages destined to the neighbor
     // returns number of sent messages

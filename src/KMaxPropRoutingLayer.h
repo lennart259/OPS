@@ -46,6 +46,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         int usedRNG;
         double cacheSizeReportingFrequency;
         double TimePerPacket;
+        int ackHopsToLive;
 
         int ackTtl;
 
@@ -148,6 +149,12 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void setSyncingNeighbourInfoForNextRound();
         void setSyncingNeighbourInfoForNoNeighboursOrEmptyCache();
         KSummaryVectorMsg* makeSummaryVectorMessage();
+
+        // new MaxProp
+        int SendMsgDestinedToNeighbor(string nodeMACAddress);
+        void SendRoutingInfo(string nodeMACAddress);
+        void handleRoutingMsg(cMessage *msg);
+
 
         // stats related variables
         simsignal_t dataBytesReceivedSignal;
