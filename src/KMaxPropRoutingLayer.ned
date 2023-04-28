@@ -38,7 +38,7 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
         double cacheSizeReportingFrequency @unit(s) = default(100s);
 
 		// number of hops to propagate an ACK before it is deleted.
-		int ackHopsToLive = default(10);
+		int ackTtl = default(maximumHopCount);
 		
 		// time needed to transfer a data packet
 		int bytesMsg;

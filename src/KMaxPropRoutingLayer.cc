@@ -16,6 +16,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
 {
     if (stage == 0) {
         // get parameters
+        totalNumNodes = getParentModule()->getParentModule()->par("numNodes");
         ownMACAddress = par("ownMACAddress").stringValue();
         nextAppID = 1;
         maximumCacheSize = par("maximumCacheSize");
@@ -29,8 +30,19 @@ void KMaxPropRoutingLayer::initialize(int stage)
         numEventsHandled = 0;
         ackHopsToLive = par("ackHopsToLive");
         TimePerPacket = par("TimePerPacket");
+        ackTtl = par("ackTtl");
 
         syncedNeighbourListIHasChanged = TRUE;
+
+        // initialize routingInfo
+        routingInfoList.reserve(totalNumNodes); // reserve max size of vector which could hold routing info of all nodes in the NW
+
+        RoutingInfo ownRoutingInfo;
+        ownRoutingInfo.nodeMACAddress = ownMACAddress;
+        ownRoutingInfo.peerLikelihoods.reserve(totalNumNodes);
+
+        routingInfoList.push_back(ownRoutingInfo);
+
 
     } else if (stage == 1) {
 
@@ -339,11 +351,6 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
     }
 
 
-
-
-
-
-
     KNeighbourListMsg *neighListMsg = dynamic_cast<KNeighbourListMsg*>(msg);
 
     // if no neighbours or cache is empty, just return
@@ -593,9 +600,9 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     if (found) {
         send(msg, "upperLayerOut");
         // create new ACK message and store in own cache.
-        AckCacheEntry *newAckCacheEntry = new AckCacheEntry();
+        Ack *newAckCacheEntry = new Ack();
         newAckCacheEntry->msgUniqueID = omnetDataMsg->getMsgUniqueID();
-        newAckCacheEntry->hopsToLive = ackHopsToLive;
+        newAckCacheEntry->ttl = ackTtl;
         ackCacheList.push_back(newAckCacheEntry);
 
 
@@ -776,82 +783,212 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     //emit(ackBytesReceivedSignal, (long) ackMsg->getByteLength());
     emit(totalBytesReceivedSignal, (long) ackMsg->getByteLength());
 
-    int msgUniqueID = ackMsg->getMsgUniqueID();
+    // go through all Acks in Ack List
+    for(int i = 0 ; i < ackMsg->getAckListArraySize() ; i++) {
 
-    // search own ACK cache, to see if this ack has been seen before (if yes, we have deleted a data entry already)
-    AckCacheEntry *ackCacheEntry;
-    list<AckCacheEntry*>::iterator iteratorAckCache;
-    bool found = FALSE;
-    iteratorAckCache = ackCacheList.begin();
-    while (iteratorAckCache != ackCacheList.end()) {
-        ackCacheEntry = *iteratorAckCache;
-        if (ackCacheEntry->msgUniqueID == msgUniqueID) {
-            found = TRUE;
-            break;
-        }
+        Ack ack = ackMsg->getAckList(i);
+        int msgUniqueID = ack.msgUniqueID;
 
-        iteratorAckCache++;
-    }
-    if (!found) {
-
-        // store ACK to propagate further if TTL - 1 is > 0
-        int htl = ackMsg->getHopsToLive() - 1; // decrease hops to live
-
-        // store ack'd ID in local cache
-        if(htl > 0) {
-            AckCacheEntry *newAckCacheEntry = new AckCacheEntry();
-            newAckCacheEntry->msgUniqueID = msgUniqueID;
-            newAckCacheEntry->hopsToLive = htl;
-            ackCacheList.push_back(newAckCacheEntry);
-        }
-
-
-        // search for ack'd packet in own data cache
-        CacheEntry *cacheEntry;
-        list<CacheEntry*>::iterator iteratorCache;
-        found = FALSE;
-        iteratorCache = cacheList.begin();
-        while (iteratorCache != cacheList.end()) {
-            cacheEntry = *iteratorCache;
-            if (cacheEntry->msgUniqueID == msgUniqueID) {
+        // search own ACK cache, to see if this ack has been seen before (if yes, we have deleted a data entry already)
+        Ack *ackCacheEntry;
+        list<Ack*>::iterator iteratorAckCache;
+        bool found = FALSE;
+        iteratorAckCache = ackCacheList.begin();
+        while (iteratorAckCache != ackCacheList.end()) {
+            ackCacheEntry = *iteratorAckCache;
+            if (ackCacheEntry->msgUniqueID == msgUniqueID) {
                 found = TRUE;
                 break;
             }
 
-            iteratorCache++;
+            iteratorAckCache++;
         }
-        // delete delivered (ack'd) cache entry if found
-        if (found) {
-            currentCacheSize -= cacheEntry->realPacketSize;
+        if (!found) {
 
-            emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
-            emit(currentCacheSizeBytesSignal, currentCacheSize);
-            emit(currentCacheSizeReportedCountSignal, (int) 1);
+            // store ACK to propagate further
+            // store ack'd ID in local cache
+            if(ack.ttl > 0) {
+                Ack *newAckCacheEntry = new Ack();
+                newAckCacheEntry->msgUniqueID = msgUniqueID;
+                newAckCacheEntry->ttl = ack.ttl;
+                ackCacheList.push_back(newAckCacheEntry);
+            }
 
-            emit(currentCacheSizeBytesSignal2, currentCacheSize);
 
-            cacheList.remove(cacheEntry);
-            delete cacheEntry;
+            // search for ack'd packet in own data cache
+            CacheEntry *cacheEntry;
+            list<CacheEntry*>::iterator iteratorCache;
+            found = FALSE;
+            iteratorCache = cacheList.begin();
+            while (iteratorCache != cacheList.end()) {
+                cacheEntry = *iteratorCache;
+                if (cacheEntry->msgUniqueID == msgUniqueID) {
+                    found = TRUE;
+                    break;
+                }
+
+                iteratorCache++;
+            }
+            // delete delivered (ack'd) cache entry if found
+            if (found) {
+                currentCacheSize -= cacheEntry->realPacketSize;
+
+                emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
+                emit(currentCacheSizeBytesSignal, currentCacheSize);
+                emit(currentCacheSizeReportedCountSignal, (int) 1);
+
+                emit(currentCacheSizeBytesSignal2, currentCacheSize);
+
+                cacheList.remove(cacheEntry);
+                delete cacheEntry;
+            }
         }
     }
+
+    // we're done with processing Acks now
+
     delete msg;
+}
+
+void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
+
+    // function:
+    // decrease all ttl on own ackCacheList by 1, to clear out the cache over time
+
+    int ackListSize = ackCacheList.size();
+
+    KAckMsg *ackMsg = new KAckMsg();
+
+    ackMsg->setSourceAddress(ownMACAddress.c_str());
+    ackMsg->setDestinationAddress(destinationAddress.c_str());
+    ackMsg->setAckListArraySize(ackListSize);
+
+    // before sending, we reduce the ttl of all list entries by 1
+    Ack *ackCacheEntry;
+    list<Ack*>::iterator iteratorAckCache;
+    bool found = FALSE;
+    iteratorAckCache = ackCacheList.begin();
+    int i = 0;
+    // reduce ttl in local Cache and add local cache entry to KAckMessage
+    while (iteratorAckCache != ackCacheList.end()) {
+        ackCacheEntry = *iteratorAckCache;
+        ackCacheEntry->ttl -= 1;
+        ackMsg->setAckList(i, *ackCacheEntry);
+
+        if(ackCacheEntry->ttl == 0) { // erase from own ACK list if ttl is expired
+            ackCacheList.erase(iteratorAckCache);
+        }
+
+        iteratorAckCache++;
+        i++;
+        //EV << "Ack cache entry: " << i << " has ttl of: " << ackCacheEntry->ttl;
+    }
+    send(ackMsg, "lowerLayerOut");
+
 }
 
 void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
 
-    int lenPL;
-    PeerLikelihood pL;
+    // function:
+    // current node ("node A") receives a vector of peerLikelihoods from a known MacAddress ("node B")
+    // node A searches in his own routingInfoList, if it already has a vector from node B
+    // if yes: it replaces it, if no, it adds the new vector to the local list
+    // node A keeps his own routingInfo at position 0 of his routingInfoList.
+    // in his own routingInfo it searches for the MAC Address of node B,
+    // if it is found: add 1 to the current likelihood and divide all entries by 2
+    // if it is not found: add new entry containing 1 as likelihood, and divide all entries by 2
+    // skip division by 2, if the added entry was the very first node encountered
 
-    lenPL = routingInfoMsg->getPeerLikelihoodsArraySize();
+
+    // 0. Extract data from the message
+    string nodeBMacAddress = routingInfoMsg->getSourceAddress();
     EV << "RoutingInfo arrived at node: " << ownMACAddress << " !!!";
-    for(int i = 0; i < lenPL; i++) {
-        pL = routingInfoMsg->getPeerLikelihoods(i);
-        EV << "MAC: " << pL.nodeMACAddress << ", Likelihood: " << pL.likelihood << ".";
+
+    // create new RoutingInfo object which we get out of the message
+    RoutingInfo nodeBRoutingInfo;
+    nodeBRoutingInfo.nodeMACAddress = nodeBMacAddress;
+    for(int i = 0; i < routingInfoMsg->getPeerLikelihoodsArraySize(); i++) {
+        nodeBRoutingInfo.peerLikelihoods.push_back(routingInfoMsg->getPeerLikelihoods(i));
     }
+
+    // 1. check if we have met the node before and already have its peerLikelihoods
+    bool found = false;
+    vector<RoutingInfo>::size_type index = 0;
+    while(index != routingInfoList.size()) {
+        if(routingInfoList[index].nodeMACAddress == nodeBMacAddress) {
+            found = true;
+            break;
+        }
+        index++;
+    }
+    if(found) { // copy the routingInfo to the existing location, replacing the old info
+        routingInfoList[index] = nodeBRoutingInfo;
+        EV << "we REPLACED routing info \n";
+    }
+    else { // add new routing info
+        routingInfoList.push_back(nodeBRoutingInfo);
+        EV << "we added new routing info \n";
+    }
+
+
+    // Update own peerLikelihoods based on meeting nodeB
+
+    //search if we have encountered nodeB before.
+    found = false;
+    vector<PeerLikelihood>::size_type indexPl = 0;
+    vector<PeerLikelihood>::size_type totalSizePl = routingInfoList[0].peerLikelihoods.size();
+    while(indexPl != totalSizePl) {
+        if(routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress == nodeBMacAddress) {
+            found = true;
+            break;
+        }
+        indexPl++;
+    }
+    if(found) { // update peerLikelihood
+        routingInfoList[0].peerLikelihoods[indexPl].likelihood += 1;
+        EV << "we increased peerLikelihood for peer " << nodeBMacAddress << " by one \n";
+    }
+    else { // add new peerLikelihood
+        PeerLikelihood newPL;
+        newPL.nodeMACAddress = nodeBMacAddress;
+        newPL.likelihood = 1.0;
+        routingInfoList[0].peerLikelihoods.push_back(newPL);
+        EV << "we added new peer to own peerLikelihood list \n";
+    }
+
+    // only re-normalize, if the added entry was not the first one.
+    EV << "Re-normalizing the local peerLikelihood list for node: " << ownMACAddress;
+    totalSizePl = routingInfoList[0].peerLikelihoods.size();
+    if(totalSizePl > 1 || found) {
+        for(indexPl = 0; indexPl != totalSizePl; indexPl++) {
+            routingInfoList[0].peerLikelihoods[indexPl].likelihood /= 2.0;
+            EV << "Node: " << routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress << ", likelihood: " << routingInfoList[0].peerLikelihoods[indexPl].likelihood << "\n";
+
+        }
+    }
+
     delete msg;
 }
 
+void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
+    KRoutingInfoMsg *routingInfoMsg = new KRoutingInfoMsg();
+
+    vector<PeerLikelihood>::size_type totalSizePl = routingInfoList[0].peerLikelihoods.size();
+    vector<PeerLikelihood>::size_type indexPl;
+    routingInfoMsg->setSourceAddress(ownMACAddress.c_str());
+    routingInfoMsg->setDestinationAddress(destinationAddress.c_str());
+    routingInfoMsg->setPeerLikelihoodsArraySize(totalSizePl);
+
+    for(indexPl = 0; indexPl != totalSizePl; indexPl++) {
+        PeerLikelihood pL;
+        pL.nodeMACAddress = routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress;
+        pL.likelihood = routingInfoList[0].peerLikelihoods[indexPl].likelihood;
+        routingInfoMsg->setPeerLikelihoods(indexPl, pL);
+    }
+    send(routingInfoMsg, "lowerLayerOut");
+
+}
 
 KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbourInfo(string nodeMACAddress)
 {

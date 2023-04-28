@@ -35,6 +35,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
 
     // todo: What is not needed for MaxProp?
     private:
+        int totalNumNodes;
         string ownMACAddress;
         int nextAppID;
         int maximumCacheSize;
@@ -46,7 +47,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         double cacheSizeReportingFrequency;
         double TimePerPacket;
 
-        int ackHopsToLive;
+        int ackTtl;
 
         int numEventsHandled;
         int currentCacheSize;
@@ -110,22 +111,24 @@ class KMaxPropRoutingLayer : public cSimpleModule
         */
 
         struct RoutingInfo {
-            string nodeMACAdress;       // the node's own node ID
-            list<PeerLikelihood*> peerLikelihoods; // other node ID's and path likelihoods
+            string nodeMACAddress;       // the node's own node ID
+            vector<PeerLikelihood> peerLikelihoods; // other node ID's and path likelihoods
         };
 
+        /*
         struct AckCacheEntry{
             int hopsToLive;
             int msgUniqueID;
         };
+        */
 
         // local list holding all lists of peerLikelihoods for a respective node
-        list<RoutingInfo*> routingInfoList; // idk if this works
+        vector<RoutingInfo> routingInfoList; // idk if this works
 
         list<AppInfo*> registeredAppList;
         list<CacheEntry*> cacheList;
         list<SyncedNeighbour*> syncedNeighbourList;
-        list<AckCacheEntry*> ackCacheList;
+        list<Ack*> ackCacheList;
         bool syncedNeighbourListIHasChanged;
 
         void ageDataInCache();
@@ -139,6 +142,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void handleAckMsgFromLowerLayer(cMessage *msg);
         void handleRoutingInfoMsgFromLowerLayer(cMessage *msg);
 
+        void sendRoutingInfoMessage(string destinationAddress);
+        void sendAckVectorMessage(string destinationAddress);
         SyncedNeighbour* getSyncingNeighbourInfo(string nodeMACAddress);
         void setSyncingNeighbourInfoForNextRound();
         void setSyncingNeighbourInfoForNoNeighboursOrEmptyCache();
