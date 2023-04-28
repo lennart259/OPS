@@ -44,6 +44,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         bool useTTL;
         int usedRNG;
         double cacheSizeReportingFrequency;
+        double TimePerPacket;
 
         int ackHopsToLive;
 
