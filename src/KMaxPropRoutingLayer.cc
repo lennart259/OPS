@@ -84,6 +84,15 @@ int KMaxPropRoutingLayer::numInitStages() const
     return 3;
 }
 
+
+
+/************************ handleMessage() *************************
+ *
+ * will be called each time, the omnet simulator throws an event.
+ * contains a large conditional statement to determine the type of message
+ * and then call a respective subfunction
+ *
+ * */
 void KMaxPropRoutingLayer::handleMessage(cMessage *msg)
 {
     cGate *gate;
@@ -164,6 +173,13 @@ void KMaxPropRoutingLayer::handleMessage(cMessage *msg)
     }
 }
 
+
+/* **************************ageDataInCache()*******************************
+ *
+ * iterates through cache list and deletes cache entries that are not
+ * valid anymore (checked against simTime with the cache entry parameter validUntilTime
+ *
+ * */
 void KMaxPropRoutingLayer::ageDataInCache()
 {
 
@@ -201,6 +217,12 @@ void KMaxPropRoutingLayer::ageDataInCache()
 }
 
 
+
+/* **************************handleAppRegistrationMsg()**********************************
+ *
+ * Appends to registeredAppList, if new app is requested and not already included
+ *
+ * */
 void KMaxPropRoutingLayer::handleAppRegistrationMsg(cMessage *msg)
 {
     KRegisterAppMsg *regAppMsg = dynamic_cast<KRegisterAppMsg*>(msg);
@@ -228,6 +250,15 @@ void KMaxPropRoutingLayer::handleAppRegistrationMsg(cMessage *msg)
 
 }
 
+/***************************handleDataMsgFromUpperLayer()************************
+ *
+ * is called, when the app generates a new datamessage for itself.
+ * function checks, wether the message already exists in cache.
+ * if not, new message is appended.
+ * if cache size now exceeds maxCacheSize: delete oldest msg.
+ * TODO: implement actual caching policy that is: sort messages according to maxprop protocol and then delete last msgs
+ *
+ */
 void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
 {
     KDataMsg *omnetDataMsg = dynamic_cast<KDataMsg*>(msg);
@@ -249,6 +280,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
     if (!found) {
 
         // apply caching policy if limited cache and cache is full
+        // TODO: implement caching policy function and replace this code (see also todo above in function description)
         if (maximumCacheSize != 0
                 && (currentCacheSize + omnetDataMsg->getRealPayloadSize()) > maximumCacheSize
                 && cacheList.size() > 0) {
@@ -320,6 +352,17 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
     delete msg;
 }
 
+
+/**************************handleNeighbourListMsgFromLowerLayer()***************************
+ *
+ * periodically, we get the info about all neighbour nodes (nodes in wireless reach)
+ *
+ * each time, the function is called, we iterate through the new neighbourlist and determine,
+ * if we need to sync with each respective neighbour or not
+ *
+ * TODO: Julian, sync prozess aendert sich sicher etwas
+ *
+ */
 void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 {
 
@@ -453,6 +496,15 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
     delete msg;
 }
 
+
+/* *********************handleDataMsgFromLowerLayer()********************
+ *
+ * Upon reception of a new DataMessage from a peer, we check if its destined to us.
+ * If yes: pass to upper layer (to app)
+ * If not, it is added to the local cache (and check for duplicates).
+ * If maxSize is exceeded, apply caching policy
+ *
+ */
 void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 {
     KDataMsg *omnetDataMsg = dynamic_cast<KDataMsg*>(msg);
@@ -761,6 +813,16 @@ void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
 }
 
 // todo handleAckMsg Lennart
+
+/* ********************handleAckMsgFromLowerLayer()**************************
+ *
+ * upon reception of an ack message:
+ * - search if ack has been seen before (if yes, do nothing, just keep the existing ack, dispose the new)
+ * - in case of new ack:
+ *   - store in ack cache
+ *   - search data cache for uniqueID that was ack'd, if found, delete data cache entry.
+ *
+ * */
 void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
 {
     KAckMsg *ackMsg = dynamic_cast<KAckMsg*>(msg);
@@ -815,7 +877,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
 
                 iteratorCache++;
             }
-            // delete delivered (ack'd) cache entry if found
+            // delete delivered (ack'd) cache entry
             if (found) {
                 currentCacheSize -= cacheEntry->realPacketSize;
 
@@ -836,10 +898,14 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     delete msg;
 }
 
+/* *********************sendAckVectorMessage(string destinationAddress)****************************
+ *
+ * sends out the current ack cache to a destination address.
+ * before sending, decrease all ack ttl by one, to clear out cache afer time.
+ * an ack is deleted from cache before sending, if the ttl is 0.
+ *
+ * */
 void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
-
-    // function:
-    // decrease all ttl on own ackCacheList by 1, to clear out the cache over time
 
     int ackListSize = ackCacheList.size();
 
