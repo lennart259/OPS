@@ -45,6 +45,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         bool useTTL;
         int usedRNG;
         double cacheSizeReportingFrequency;
+        double TimePerPacket;
+        int ackHopsToLive;
 
         int ackTtl;
 
@@ -98,6 +100,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
             bool neighbourSyncing;
             double neighbourSyncEndTime;
 
+            bool ackSent;
+
             bool nodeConsidered;
 
         };
@@ -147,6 +151,10 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void setSyncingNeighbourInfoForNextRound();
         void setSyncingNeighbourInfoForNoNeighboursOrEmptyCache();
         KSummaryVectorMsg* makeSummaryVectorMessage();
+
+        // new MaxProp
+        int sendMsgDestinedToNeighbor(string nodeMACAddress);
+
 
         // stats related variables
         simsignal_t dataBytesReceivedSignal;
