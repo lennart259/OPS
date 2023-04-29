@@ -202,7 +202,6 @@ void KMaxPropRoutingLayer::ageDataInCache()
 
 }
 
-
 void KMaxPropRoutingLayer::handleAppRegistrationMsg(cMessage *msg)
 {
     KRegisterAppMsg *regAppMsg = dynamic_cast<KRegisterAppMsg*>(msg);
@@ -431,6 +430,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             syncedNeighbour->randomBackoffEndTime = 0.0;
             syncedNeighbour->neighbourSyncing = FALSE;
             syncedNeighbour->neighbourSyncEndTime = 0.0;
+            syncedNeighbour->ackSent = FALSE;
 
             // // send summary vector (to start syncing)
             // KSummaryVectorMsg *summaryVectorMsg = makeSummaryVectorMessage();
@@ -440,12 +440,13 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             // todo phase detection
             // phase 1:
             // todo send packets destined to the neighbor
-            int numMsg = SendMsgDestinedToNeighbor(nodeMACAddress.c_str());
+            int numMsg = sendMsgDestinedToNeighbor(nodeMACAddress.c_str());
+            // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
             syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + numMsg*TimePerPacket + maximumRandomBackoffDuration;
             syncedNeighbour->neighbourSyncing = TRUE;
             // phase 2:
             // todo send routing info and Ack messages
-            SendRoutingInfo(nodeMACAddress.c_str());
+            sendRoutingInfoMessage(nodeMACAddress.c_str());
             // phase 3:
             // todo other data transfer
 
@@ -1069,25 +1070,14 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
         iteratorSyncedNeighbour++;
     }
 }
-int KMaxPropRoutingLayer::SendMsgDestinedToNeighbor(string nodeMACAddress)
+
+int KMaxPropRoutingLayer::sendMsgDestinedToNeighbor(string nodeMACAddress)
 {
     // sends all messages destined to the neighbor
     // returns number of sent messages
+    // deletes these messages from the cache
     return 0;
 }
-
-void KMaxPropRoutingLayer::SendRoutingInfo(string nodeMACAddress)
-{
-    // send routing info
-}
-
-void KMaxPropRoutingLayer::handleRoutingMsg(cMessage *msg)
-{
-    // handles routing info
-    // send Ack Message
-}
-
-
 
 KSummaryVectorMsg* KMaxPropRoutingLayer::makeSummaryVectorMessage()
 {

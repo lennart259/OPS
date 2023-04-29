@@ -100,6 +100,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
             bool neighbourSyncing;
             double neighbourSyncEndTime;
 
+            bool ackSent;
+
             bool nodeConsidered;
 
         };
@@ -151,9 +153,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         KSummaryVectorMsg* makeSummaryVectorMessage();
 
         // new MaxProp
-        int SendMsgDestinedToNeighbor(string nodeMACAddress);
-        void SendRoutingInfo(string nodeMACAddress);
-        void handleRoutingMsg(cMessage *msg);
+        int sendMsgDestinedToNeighbor(string nodeMACAddress);
 
 
         // stats related variables
