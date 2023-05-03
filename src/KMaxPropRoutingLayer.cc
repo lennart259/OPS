@@ -462,40 +462,49 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             syncWithNeighbour = FALSE;
 
         }
-
         // from previous questions - if syncing required
         if (syncWithNeighbour) {
+            if (syncedNeighbour->sendRoutingNext){
+                // phase 2:
+                // todo send routing info and Ack messages
+                sendRoutingInfoMessage(nodeMACAddress.c_str());
+                syncedNeighbour->sendRoutingNext = FALSE;
+                syncedNeighbour->sendDataNext = TRUE;
+            }
+            else if (syncedNeighbour->sendDataNext){
+                // phase 2:
+                // todo send routing info and Ack messages
+                sendRoutingInfoMessage(nodeMACAddress.c_str());
+                syncedNeighbour->sendDataNext = FALSE;
+            }
+            else{
+                // set the cooloff period
+                syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
 
-            // set the cooloff period
-            syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
+                // initialize all other checks
+                syncedNeighbour->randomBackoffStarted = FALSE;
+                syncedNeighbour->randomBackoffEndTime = 0.0;
+                syncedNeighbour->neighbourSyncing = FALSE;
+                syncedNeighbour->neighbourSyncEndTime = 0.0;
+                syncedNeighbour->sendRoutingNext = TRUE;
+                syncedNeighbour->sendDataNext = FALSE;
 
-            // initialize all other checks
-            syncedNeighbour->randomBackoffStarted = FALSE;
-            syncedNeighbour->randomBackoffEndTime = 0.0;
-            syncedNeighbour->neighbourSyncing = FALSE;
-            syncedNeighbour->neighbourSyncEndTime = 0.0;
-            syncedNeighbour->ackSent = FALSE;
+                // // send summary vector (to start syncing)
+                // KSummaryVectorMsg *summaryVectorMsg = makeSummaryVectorMessage();
+                // summaryVectorMsg->setDestinationAddress(nodeMACAddress.c_str());
+                // send(summaryVectorMsg, "lowerLayerOut");
 
-            // // send summary vector (to start syncing)
-            // KSummaryVectorMsg *summaryVectorMsg = makeSummaryVectorMessage();
-            // summaryVectorMsg->setDestinationAddress(nodeMACAddress.c_str());
-            // send(summaryVectorMsg, "lowerLayerOut");
+                // todo phase detection
+                // phase 1:
+                // todo send packets destined to the neighbor
+                int numMsg = sendDataDestinedToNeighbor(nodeMACAddress.c_str());
+                // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
+                syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (numMsg+1)*TimePerPacket + maximumRandomBackoffDuration;
+                syncedNeighbour->neighbourSyncing = TRUE;
 
-            // todo phase detection
-            // phase 1:
-            // todo send packets destined to the neighbor
-            int numMsg = sendMsgDestinedToNeighbor(nodeMACAddress.c_str());
-            // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
-            syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + numMsg*TimePerPacket + maximumRandomBackoffDuration;
-            syncedNeighbour->neighbourSyncing = TRUE;
-            // phase 2:
-            // todo send routing info and Ack messages
-            sendRoutingInfoMessage(nodeMACAddress.c_str());
-            // phase 3:
-            // todo other data transfer
-
-            // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
-            // emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
+                // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
+                // emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
+            }
         }
 
         i++;
@@ -1087,6 +1096,8 @@ KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbour
         syncedNeighbour->neighbourSyncing = FALSE;
         syncedNeighbour->neighbourSyncEndTime = 0.0;
         syncedNeighbour->nodeConsidered = FALSE;
+        syncedNeighbour->sendRoutingNext = FALSE;
+        syncedNeighbour->sendDataNext = FALSE;
 
         syncedNeighbourList.push_back(syncedNeighbour);
     }
@@ -1138,7 +1149,7 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     }
 }
 
-int KMaxPropRoutingLayer::sendMsgDestinedToNeighbor(string nodeMACAddress)
+int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string nodeMACAddress)
 {
     // sends all messages destined to the neighbor
     // returns number of sent messages
