@@ -143,18 +143,22 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void handleSummaryVectorMsgFromLowerLayer(cMessage *msg);
         void handleDataRequestMsgFromLowerLayer(cMessage *msg);
 
-        void handleAckMsgFromLowerLayer(cMessage *msg);
-        void handleRoutingInfoMsgFromLowerLayer(cMessage *msg);
 
-        void sendRoutingInfoMessage(string destinationAddress);
-        void sendAckVectorMessage(string destinationAddress);
         SyncedNeighbour* getSyncingNeighbourInfo(string nodeMACAddress);
         void setSyncingNeighbourInfoForNextRound();
         void setSyncingNeighbourInfoForNoNeighboursOrEmptyCache();
         KSummaryVectorMsg* makeSummaryVectorMessage();
 
         // new MaxProp
+        void handleAckMsgFromLowerLayer(cMessage *msg);
+        void handleRoutingInfoMsgFromLowerLayer(cMessage *msg);
+
+        void sendRoutingInfoMessage(string destinationAddress);
+        void sendAckVectorMessage(string destinationAddress);
+
         int sendDataDestinedToNeighbor(string nodeMACAddress);
+        void sortBuffer(int mode);
+        static bool compare_hopcount(const CacheEntry* first, const CacheEntry* second);
 
 
         // stats related variables

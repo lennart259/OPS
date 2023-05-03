@@ -41,7 +41,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
         ownRoutingInfo.nodeMACAddress = ownMACAddress;
         ownRoutingInfo.peerLikelihoods.reserve(totalNumNodes);
 
-        routingInfoList.push_back(ownRoutingInfo); // own routing info is always routingInfoList[0]
+        routingInfoList.push_back(ownRoutingInfo);
 
 
     } else if (stage == 1) {
@@ -218,6 +218,7 @@ void KMaxPropRoutingLayer::ageDataInCache()
 
 }
 
+<<<<<<< HEAD
 
 
 /* **************************handleAppRegistrationMsg()**********************************
@@ -225,6 +226,8 @@ void KMaxPropRoutingLayer::ageDataInCache()
  * Appends to registeredAppList, if new app is requested and not already included
  *
  * */
+=======
+>>>>>>> 0ecfda9a91a28333d3186fd98db50cb168ff4f82
 void KMaxPropRoutingLayer::handleAppRegistrationMsg(cMessage *msg)
 {
     KRegisterAppMsg *regAppMsg = dynamic_cast<KRegisterAppMsg*>(msg);
@@ -462,48 +465,40 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             syncWithNeighbour = FALSE;
 
         }
+
         // from previous questions - if syncing required
         if (syncWithNeighbour) {
-            if (syncedNeighbour->sendRoutingNext){
-                // phase 2:
-                // todo send routing info and Ack messages
-                sendRoutingInfoMessage(nodeMACAddress.c_str());
-                syncedNeighbour->sendRoutingNext = FALSE;
-                syncedNeighbour->sendDataNext = TRUE;
-            }
-            else if (syncedNeighbour->sendDataNext){
-                // phase 3:
-                // todo send data
-                syncedNeighbour->sendDataNext = FALSE;
-            }
-            else{
-                // set the cooloff period
-                syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
 
-                // initialize all other checks
-                syncedNeighbour->randomBackoffStarted = FALSE;
-                syncedNeighbour->randomBackoffEndTime = 0.0;
-                syncedNeighbour->neighbourSyncing = FALSE;
-                syncedNeighbour->neighbourSyncEndTime = 0.0;
-                syncedNeighbour->sendRoutingNext = TRUE;
-                syncedNeighbour->sendDataNext = FALSE;
+            // set the cooloff period
+            syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
 
-                // // send summary vector (to start syncing)
-                // KSummaryVectorMsg *summaryVectorMsg = makeSummaryVectorMessage();
-                // summaryVectorMsg->setDestinationAddress(nodeMACAddress.c_str());
-                // send(summaryVectorMsg, "lowerLayerOut");
+            // initialize all other checks
+            syncedNeighbour->randomBackoffStarted = FALSE;
+            syncedNeighbour->randomBackoffEndTime = 0.0;
+            syncedNeighbour->neighbourSyncing = FALSE;
+            syncedNeighbour->neighbourSyncEndTime = 0.0;
+            syncedNeighbour->ackSent = FALSE;
 
-                // todo phase detection
-                // phase 1:
-                // todo send packets destined to the neighbor
-                int numMsg = sendDataDestinedToNeighbor(nodeMACAddress.c_str());
-                // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
-                syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (numMsg+1)*TimePerPacket + maximumRandomBackoffDuration;
-                syncedNeighbour->neighbourSyncing = TRUE;
+            // // send summary vector (to start syncing)
+            // KSummaryVectorMsg *summaryVectorMsg = makeSummaryVectorMessage();
+            // summaryVectorMsg->setDestinationAddress(nodeMACAddress.c_str());
+            // send(summaryVectorMsg, "lowerLayerOut");
 
-                // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
-                // emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
-            }
+            // todo phase detection
+            // phase 1:
+            // todo send packets destined to the neighbor
+            int numMsg = sendMsgDestinedToNeighbor(nodeMACAddress.c_str());
+            // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
+            syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + numMsg*TimePerPacket + maximumRandomBackoffDuration;
+            syncedNeighbour->neighbourSyncing = TRUE;
+            // phase 2:
+            // todo send routing info and Ack messages
+            sendRoutingInfoMessage(nodeMACAddress.c_str());
+            // phase 3:
+            // todo other data transfer
+
+            // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
+            // emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
         }
 
         i++;
@@ -886,6 +881,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
                 ackCacheList.push_back(newAckCacheEntry);
             }
 
+
             // search for ack'd packet in own data cache
             CacheEntry *cacheEntry;
             list<CacheEntry*>::iterator iteratorCache;
@@ -962,21 +958,18 @@ void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
 
 }
 
-/**********************handleRoutingInfoMsgFromLowerLayer()*************************
- *
- * current node ("node A") receives a vector of peerLikelihoods from a known MacAddress ("node B")
- * node A searches in his own routingInfoList, if it already has a vector from node B
- * if yes: it replaces it, if no, it adds the new vector to the local list
- * node A keeps his own routingInfo at position 0 of his routingInfoList.
- * in his own routingInfo it searches for the MAC Address of node B,
- * if it is found: add 1 to the current likelihood and divide all entries by 2
- * if it is not found: add new entry containing 1 as likelihood, and divide all entries by 2
- * skip division by 2, if the added entry was the very first node encountered
- *
- */
 void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
 
+    // function:
+    // current node ("node A") receives a vector of peerLikelihoods from a known MacAddress ("node B")
+    // node A searches in his own routingInfoList, if it already has a vector from node B
+    // if yes: it replaces it, if no, it adds the new vector to the local list
+    // node A keeps his own routingInfo at position 0 of his routingInfoList.
+    // in his own routingInfo it searches for the MAC Address of node B,
+    // if it is found: add 1 to the current likelihood and divide all entries by 2
+    // if it is not found: add new entry containing 1 as likelihood, and divide all entries by 2
+    // skip division by 2, if the added entry was the very first node encountered
 
 
     // 0. Extract data from the message
@@ -1049,13 +1042,6 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     delete msg;
 }
 
-
-/**********************sendRoutingInfoMessage()*************************
- *
- * take own routing info which is stored at routingInfoList[0]
- * and send it as a routingInfoMsg (array-like peer likelihoods)
- *
- * */
 void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
     KRoutingInfoMsg *routingInfoMsg = new KRoutingInfoMsg();
 
@@ -1074,48 +1060,6 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
     send(routingInfoMsg, "lowerLayerOut");
 
 }
-
-// comparison, based on hopsTravelled
-bool KMaxPropRoutingLayer::compare_hopcount (const CacheEntry *first, const CacheEntry *second)
-{
-  return ( first->hopsTravelled < second->hopsTravelled );
-}
-
-/********************sortBuffer()**************************
- *
- * sort the local buffer (cacheList) by criterion:
- * mode = 0: only hopcount
- * todo: mode = 1: only peerLikelihood
- * todo: mode = 2: maxprop: split the buffer, first half is sorted by hopcount, 2nd half
- * is by peer likelihood, the splitpoint is dynamic.
- * */
-
-void KMaxPropRoutingLayer::sortBuffer(int mode){
-    switch(mode) {
-    case 0: // sort only by hopcount
-        cacheList.sort(compare_hopcount);
-        break;
-    default:
-        break;
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbourInfo(string nodeMACAddress)
 {
@@ -1146,8 +1090,6 @@ KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbour
         syncedNeighbour->neighbourSyncing = FALSE;
         syncedNeighbour->neighbourSyncEndTime = 0.0;
         syncedNeighbour->nodeConsidered = FALSE;
-        syncedNeighbour->sendRoutingNext = FALSE;
-        syncedNeighbour->sendDataNext = FALSE;
 
         syncedNeighbourList.push_back(syncedNeighbour);
     }
@@ -1199,7 +1141,7 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     }
 }
 
-int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string nodeMACAddress)
+int KMaxPropRoutingLayer::sendMsgDestinedToNeighbor(string nodeMACAddress)
 {
     // sends all messages destined to the neighbor
     // returns number of sent messages
