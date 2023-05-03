@@ -472,9 +472,8 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 syncedNeighbour->sendDataNext = TRUE;
             }
             else if (syncedNeighbour->sendDataNext){
-                // phase 2:
-                // todo send routing info and Ack messages
-                sendRoutingInfoMessage(nodeMACAddress.c_str());
+                // phase 3:
+                // todo send data
                 syncedNeighbour->sendDataNext = FALSE;
             }
             else{
