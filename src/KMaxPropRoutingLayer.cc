@@ -622,6 +622,17 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
             cacheEntry->createdTime = simTime().dbl();
             cacheEntry->updatedTime = simTime().dbl();
 
+            //copy hop list
+             string hopMac;
+             vector<string> selectedMessageIDList;
+             int i = 0;
+             while (i < omnetDataMsg->getHopListArraySize()) {
+                 hopMac = omnetDataMsg->getHopList(i);
+                 cacheEntry->hopList.push_back(hopMac);
+             }
+             // add last hop (source MAC) to hopList
+             cacheEntry->hopList.push_back(omnetDataMsg->getSourceAddress());
+
             cacheList.push_back(cacheEntry);
 
             currentCacheSize += cacheEntry->realPayloadSize;
@@ -1199,11 +1210,43 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     }
 }
 
-int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string nodeMACAddress)
+int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
 {
     // sends all messages destined to the neighbor
     // returns number of sent messages
     // deletes these messages from the cache
+
+    // not complete, for missing code, see handleDataRequestMsgFromLowerLayer()
+
+
+
+    // code to create hop list
+    KDataMsg *dataMsg = new KDataMsg();
+
+    // todo iterate through all cache entries that should be sent, in the correct order
+    while(false){
+        CacheEntry *cacheEntry;
+
+        dataMsg->setSourceAddress(ownMACAddress.c_str());
+        dataMsg->setDestinationAddress(destinationAddress.c_str());
+
+
+        // handle hop list
+        dataMsg->setHopListArraySize(cacheEntry->hopList.size());
+
+        list<string>::iterator iteratorHopList;
+        iteratorHopList = cacheEntry->hopList.begin();
+        int i = 0;
+        while (iteratorHopList != cacheEntry->hopList.end()) {
+            string hop = *iteratorHopList;
+            dataMsg->setHopList(i, hop.c_str());
+            iteratorHopList++;
+        }
+
+
+        send(dataMsg, "lowerLayerOut");
+    }
+
     return 0;
 }
 

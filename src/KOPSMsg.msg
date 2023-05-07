@@ -48,7 +48,8 @@ packet KDataMsg {
     int duplicates;
     
     // MaxProp Specific Fields
-    // TODO: hopList
+    string hopList[];
+    
 }
 
 //
