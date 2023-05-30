@@ -159,6 +159,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void sendAckVectorMessage(string destinationAddress);
 
         int sendDataDestinedToNeighbor(string nodeMACAddress);
+        void sendDataMsgs(string nodeMACAddress);
         void sortBuffer(int mode);
         static bool compare_hopcount(const CacheEntry* first, const CacheEntry* second);
 

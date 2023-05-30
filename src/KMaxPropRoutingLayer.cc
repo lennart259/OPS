@@ -474,6 +474,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             else if (syncedNeighbour->sendDataNext){
                 // phase 3:
                 // todo send data
+                sendDataMsgs(nodeMACAddress.c_str());
                 syncedNeighbour->sendDataNext = FALSE;
             }
             else{
@@ -1210,6 +1211,43 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     }
 }
 
+void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
+{
+    // sort Buffer
+    sortBuffer(0);   // 0: sort by hopcount
+
+    // sends all messages not destined to the neighbor
+
+    // not complete, for missing code, see handleDataRequestMsgFromLowerLayer()
+
+    // todo iterate through all cache entries that should be sent, in the correct order
+    while(false){
+        // code to create hop list
+        KDataMsg *dataMsg = new KDataMsg();
+
+        CacheEntry *cacheEntry;
+
+        dataMsg->setSourceAddress(ownMACAddress.c_str());
+        dataMsg->setDestinationAddress(destinationAddress.c_str());
+
+
+        // handle hop list
+        dataMsg->setHopListArraySize(cacheEntry->hopList.size());
+
+        list<string>::iterator iteratorHopList;
+        iteratorHopList = cacheEntry->hopList.begin();
+        int i = 0;
+        while (iteratorHopList != cacheEntry->hopList.end()) {
+            string hop = *iteratorHopList;
+            dataMsg->setHopList(i, hop.c_str());
+            iteratorHopList++;
+        }
+
+
+        send(dataMsg, "lowerLayerOut");
+    }
+}
+
 int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
 {
     // sends all messages destined to the neighbor
@@ -1218,13 +1256,11 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
 
     // not complete, for missing code, see handleDataRequestMsgFromLowerLayer()
 
-
-
-    // code to create hop list
-    KDataMsg *dataMsg = new KDataMsg();
-
     // todo iterate through all cache entries that should be sent, in the correct order
     while(false){
+        // code to create hop list
+        KDataMsg *dataMsg = new KDataMsg();
+
         CacheEntry *cacheEntry;
 
         dataMsg->setSourceAddress(ownMACAddress.c_str());
