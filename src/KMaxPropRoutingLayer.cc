@@ -396,7 +396,8 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
     KNeighbourListMsg *neighListMsg = dynamic_cast<KNeighbourListMsg*>(msg);
 
     // if no neighbours or cache is empty, just return
-    if (neighListMsg->getNeighbourNameListArraySize() == 0 || cacheList.size() == 0) {
+    // todo
+    if ((neighListMsg->getNeighbourNameListArraySize() == 0 || cacheList.size() == 0) && ackCacheList.size() == 0) {
 
         // setup sync neighbour list for the next time - only if there were some changes
         if (syncedNeighbourListIHasChanged) {
@@ -410,7 +411,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 
     // send summary vector messages (if appropriate) to all nodes to sync in a loop
     i = 0;
-    EV << "neighbors: " << neighListMsg->getNeighbourNameListArraySize() << "";
+    EV << "neighbors: " << neighListMsg->getNeighbourNameListArraySize() << "\n";
     while (i < neighListMsg->getNeighbourNameListArraySize()) {
         string nodeMACAddress = neighListMsg->getNeighbourNameList(i);
 
@@ -420,8 +421,8 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
         routingInfoMsg->setDestinationAddress(nodeMACAddress.c_str());
         send(routingInfoMsg, "lowerLayerOut");
 
-        EV << "Sending routing Info to : " << nodeMACAddress.c_str() << "";
          */
+        EV << ownMACAddress << " is looking at Neighbour : " << nodeMACAddress.c_str() << "\n";
         // get syncing info of neighbor
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
 
@@ -466,19 +467,22 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             if (syncedNeighbour->sendRoutingNext){
                 // phase 2:
                 // todo send routing info and Ack messages
+                EV << "Send Routing / ACK" << "\n";
                 sendRoutingInfoMessage(nodeMACAddress.c_str());
                 syncedNeighbour->sendRoutingNext = FALSE;
-                syncedNeighbour->sendDataNext = TRUE;
+                // syncedNeighbour->sendDataNext = TRUE;
             }
             else if (syncedNeighbour->sendDataNext){
                 // phase 3:
                 // todo send data
+                EV << "Send Data" << "\n";
                 sendDataMsgs(nodeMACAddress.c_str());
                 syncedNeighbour->sendDataNext = FALSE;
             }
             else{
                 // set the cooloff period
                 syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
+                EV << "Reset CoolOffEndTime next reset: " << syncedNeighbour->syncCoolOffEndTime << "\n";
 
                 // initialize all other checks
                 syncedNeighbour->randomBackoffStarted = FALSE;
@@ -496,9 +500,10 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 // todo phase detection
                 // phase 1:
                 // todo send packets destined to the neighbor
-                int numMsg = sendDataDestinedToNeighbor(nodeMACAddress.c_str());
+                int numMsg = sendDataDestinedToNeighbor(nodeMACAddress);
                 // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
                 syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (numMsg+1)*TimePerPacket + maximumRandomBackoffDuration;
+                EV << "Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
                 syncedNeighbour->neighbourSyncing = TRUE;
 
                 // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
@@ -929,6 +934,20 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
 
     // we're done with processing Acks now
 
+    // Proceed with sync Process
+    string nodeBMacAddress = ackMsg->getSourceAddress();
+    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress.c_str());
+    if (syncedNeighbour->sendDataNext){
+        // we can send Data next
+        sendDataMsgs(nodeBMacAddress.c_str());
+        syncedNeighbour->sendDataNext = FALSE;
+    }
+    else{
+        // routing info is send, but sendDataNext is False
+        // -> we did not send Ack Vector so we send it now
+        sendAckVectorMessage(nodeBMacAddress.c_str());
+        syncedNeighbour->sendDataNext = TRUE;
+    }
     delete msg;
 }
 
@@ -1054,6 +1073,18 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
             EV << "Node: " << routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress << ", likelihood: " << routingInfoList[0].peerLikelihoods[indexPl].likelihood << "\n";
 
         }
+    }
+
+    // Proceed with sync Process
+    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress.c_str());
+    if (syncedNeighbour->sendRoutingNext){
+        sendRoutingInfoMessage(nodeBMacAddress.c_str());
+        syncedNeighbour->sendRoutingNext = FALSE;
+    }
+    else{
+        //
+        sendAckVectorMessage(nodeBMacAddress.c_str());
+        syncedNeighbour->sendDataNext = TRUE;
     }
 
     delete msg;
@@ -1250,12 +1281,14 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
         // check if cache entry is destination oriented and
         // the current neighbor is the final destination
         if((cacheEntry->destinationOriented && strstr(destinationAddress.c_str(), cacheEntry->finalDestinationAddress.c_str()) != NULL)) {
-
+            EV << ownMACAddress << " starts sending Data Destined To Neighbor " << destinationAddress << "\n";
             createAndSendDataMessage(cacheEntry, destinationAddress);
             sentMessages++;
             // remove the cache entry from cache.
             cacheList.erase(iteratorCache);
+            delete cacheEntry;
         }
+        if (cacheList.size()==0){break;}
         iteratorCache ++;
     }
 
