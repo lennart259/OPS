@@ -837,7 +837,7 @@ void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
 
                 emit(currentCacheSizeBytesSignal2, currentCacheSize);
 
-                cacheList.remove(cacheEntry);
+                cacheList.erase(iteratorCache);
                 delete cacheEntry;
             }
         }
@@ -869,7 +869,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     for(int i = 0 ; i < ackMsg->getAckListArraySize() ; i++) {
 
         Ack ack = ackMsg->getAckList(i);
-        int msgUniqueID = ack.msgUniqueID;
+        int msgUniqueIDAckd = ack.msgUniqueID;
 
         // search own ACK cache, to see if this ack has been seen before (if yes, we have deleted a data entry already)
         Ack *ackCacheEntry;
@@ -878,7 +878,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
         iteratorAckCache = ackCacheList.begin();
         while (iteratorAckCache != ackCacheList.end()) {
             ackCacheEntry = *iteratorAckCache;
-            if (ackCacheEntry->msgUniqueID == msgUniqueID) {
+            if (ackCacheEntry->msgUniqueID == msgUniqueIDAckd) {
                 found = TRUE;
                 break;
             }
@@ -889,9 +889,10 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
 
             // store ACK to propagate further
             // store ack'd ID in local cache
+            // ack with ttl = 0 will not be stored, but we still search our cache once, if we find the ack'd package
             if(ack.ttl > 0) {
                 Ack *newAckCacheEntry = new Ack();
-                newAckCacheEntry->msgUniqueID = msgUniqueID;
+                newAckCacheEntry->msgUniqueID = msgUniqueIDAckd;
                 newAckCacheEntry->ttl = ack.ttl;
                 ackCacheList.push_back(newAckCacheEntry);
             }
@@ -903,7 +904,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
             iteratorCache = cacheList.begin();
             while (iteratorCache != cacheList.end()) {
                 cacheEntry = *iteratorCache;
-                if (cacheEntry->msgUniqueID == msgUniqueID) {
+                if (cacheEntry->msgUniqueID == msgUniqueIDAckd) {
                     found = TRUE;
                     break;
                 }
@@ -920,7 +921,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
 
                 emit(currentCacheSizeBytesSignal2, currentCacheSize);
 
-                cacheList.remove(cacheEntry);
+                cacheList.erase(iteratorCache);
                 delete cacheEntry;
             }
         }
@@ -1254,7 +1255,7 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
             createAndSendDataMessage(cacheEntry, destinationAddress);
             sentMessages++;
             // remove the cache entry from cache.
-            cacheList.remove(cacheEntry);
+            cacheList.erase(iteratorCache);
         }
         iteratorCache ++;
     }
@@ -1354,7 +1355,7 @@ void KMaxPropRoutingLayer::finish()
     while (registeredAppList.size() > 0) {
         list<AppInfo*>::iterator iteratorRegisteredApp = registeredAppList.begin();
         AppInfo *appInfo= *iteratorRegisteredApp;
-        registeredAppList.remove(appInfo);
+        registeredAppList.erase(iteratorRegisteredApp);
         delete appInfo;
     }
 
@@ -1362,7 +1363,7 @@ void KMaxPropRoutingLayer::finish()
     while (cacheList.size() > 0) {
         list<CacheEntry*>::iterator iteratorCache = cacheList.begin();
         CacheEntry *cacheEntry= *iteratorCache;
-        cacheList.remove(cacheEntry);
+        cacheList.erase(iteratorCache);
         delete cacheEntry;
     }
 
