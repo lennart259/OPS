@@ -363,7 +363,6 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
  * if we need to sync with each respective neighbour or not
  *
  * TODO: Julian, sync prozess aendert sich sicher etwas
- *
  */
 void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 {
@@ -848,7 +847,6 @@ void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
     delete msg;
 }
 
-// todo handleAckMsg Lennart
 
 /* ********************handleAckMsgFromLowerLayer()**************************
  *
@@ -984,7 +982,6 @@ void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
  * if it is found: add 1 to the current likelihood and divide all entries by 2
  * if it is not found: add new entry containing 1 as likelihood, and divide all entries by 2
  * skip division by 2, if the added entry was the very first node encountered
- *
  */
 void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     KRoutingInfoMsg *routingInfoMsg = dynamic_cast<KRoutingInfoMsg*>(msg);
@@ -1101,7 +1098,6 @@ bool KMaxPropRoutingLayer::compare_hopcount (const CacheEntry *first, const Cach
  * todo: mode = 2: maxprop: split the buffer, first half is sorted by hopcount, 2nd half
  * is by peer likelihood, the splitpoint is dynamic.
  * */
-
 void KMaxPropRoutingLayer::sortBuffer(int mode){
     switch(mode) {
     case 0: // sort only by hopcount
@@ -1111,21 +1107,6 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
         break;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1211,42 +1192,46 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     }
 }
 
+/********************sendDataMsgs(string destinationAddress)**************************
+ *
+ * sort the buffer and then send out all messages that the neighbor has not received yet,
+ * i.e. that don't have the neighbor's MAC address in their hop list.
+ *
+ * */
 void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 {
     // sort Buffer
     sortBuffer(0);   // 0: sort by hopcount
 
-    // sends all messages not destined to the neighbor
+    // iterate through the whole cacheList
+    CacheEntry *cacheEntry;
+    list<CacheEntry*>::iterator iteratorCache;
+    bool found = FALSE;
+    iteratorCache = cacheList.begin();
+    while (iteratorCache != cacheList.end()) {
+        cacheEntry = *iteratorCache;
 
-    // not complete, for missing code, see handleDataRequestMsgFromLowerLayer()
-
-    // todo iterate through all cache entries that should be sent, in the correct order
-    while(false){
-        // code to create hop list
-        KDataMsg *dataMsg = new KDataMsg();
-
-        CacheEntry *cacheEntry;
-
-        dataMsg->setSourceAddress(ownMACAddress.c_str());
-        dataMsg->setDestinationAddress(destinationAddress.c_str());
-
-
-        // handle hop list
-        dataMsg->setHopListArraySize(cacheEntry->hopList.size());
+        // iterate through the hop_list of the current message to find, if the packet should be sent to current neighbor
 
         list<string>::iterator iteratorHopList;
+        bool found = FALSE;
         iteratorHopList = cacheEntry->hopList.begin();
-        int i = 0;
         while (iteratorHopList != cacheEntry->hopList.end()) {
-            string hop = *iteratorHopList;
-            dataMsg->setHopList(i, hop.c_str());
-            iteratorHopList++;
+            if(iteratorHopList->c_str() == destinationAddress) {
+                found = TRUE;
+                break;
+            }
         }
 
+        if(!found) { // only send data message if neighbor was not found in hopList
 
-        send(dataMsg, "lowerLayerOut");
+            createAndSendDataMessage(cacheEntry, destinationAddress);
+        }
+
+        iteratorCache++;
     }
 }
+
 
 int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
 {
@@ -1254,36 +1239,70 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
     // returns number of sent messages
     // deletes these messages from the cache
 
-    // not complete, for missing code, see handleDataRequestMsgFromLowerLayer()
+    int sentMessages = 0;
+    // iterate through the whole cacheList
+    CacheEntry *cacheEntry;
+    list<CacheEntry*>::iterator iteratorCache;
+    bool found = FALSE;
+    iteratorCache = cacheList.begin();
+    while (iteratorCache != cacheList.end()) {
+        cacheEntry = *iteratorCache;
+        // check if cache entry is destination oriented and
+        // the current neighbor is the final destination
+        if((cacheEntry->destinationOriented && strstr(destinationAddress.c_str(), cacheEntry->finalDestinationAddress.c_str()) != NULL)) {
 
-    // todo iterate through all cache entries that should be sent, in the correct order
-    while(false){
-        // code to create hop list
-        KDataMsg *dataMsg = new KDataMsg();
-
-        CacheEntry *cacheEntry;
-
-        dataMsg->setSourceAddress(ownMACAddress.c_str());
-        dataMsg->setDestinationAddress(destinationAddress.c_str());
-
-
-        // handle hop list
-        dataMsg->setHopListArraySize(cacheEntry->hopList.size());
-
-        list<string>::iterator iteratorHopList;
-        iteratorHopList = cacheEntry->hopList.begin();
-        int i = 0;
-        while (iteratorHopList != cacheEntry->hopList.end()) {
-            string hop = *iteratorHopList;
-            dataMsg->setHopList(i, hop.c_str());
-            iteratorHopList++;
+            createAndSendDataMessage(cacheEntry, destinationAddress);
+            sentMessages++;
+            // remove the cache entry from cache.
+            cacheList.remove(cacheEntry);
         }
-
-
-        send(dataMsg, "lowerLayerOut");
+        iteratorCache ++;
     }
 
-    return 0;
+    return sentMessages;
+}
+
+void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, string destinationAddress) {
+    KDataMsg *dataMsg = new KDataMsg();
+
+    dataMsg->setSourceAddress(ownMACAddress.c_str());
+    dataMsg->setDestinationAddress(destinationAddress.c_str());
+    dataMsg->setDataName(cacheEntry->dataName.c_str());
+    dataMsg->setDummyPayloadContent(cacheEntry->dummyPayloadContent.c_str());
+    dataMsg->setValidUntilTime(cacheEntry->validUntilTime);
+    dataMsg->setRealPayloadSize(cacheEntry->realPayloadSize);
+    // check KOPSMsg.msg on sizing mssages
+    int realPacketSize = 6 + 6 + 2 + cacheEntry->realPayloadSize + 4 + 6 + 1;
+    dataMsg->setRealPacketSize(realPacketSize);
+    dataMsg->setByteLength(realPacketSize);
+    dataMsg->setInitialOriginatorAddress(cacheEntry->initialOriginatorAddress.c_str());
+    dataMsg->setDestinationOriented(cacheEntry->destinationOriented);
+    if (cacheEntry->destinationOriented) {
+        dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
+    }
+    dataMsg->setMessageID(cacheEntry->messageID.c_str());
+    dataMsg->setHopCount(cacheEntry->hopCount);
+    dataMsg->setGoodnessValue(cacheEntry->goodnessValue);
+    dataMsg->setHopsTravelled(cacheEntry->hopsTravelled);
+    dataMsg->setMsgUniqueID(cacheEntry->msgUniqueID);
+    dataMsg->setInitialInjectionTime(cacheEntry->initialInjectionTime);
+
+    // hop list: create array in message from list in cache entry
+    dataMsg->setHopListArraySize(cacheEntry->hopList.size());
+
+    list<string>::iterator iteratorHopList;
+    iteratorHopList = cacheEntry->hopList.begin();
+    int i = 0;
+    while (iteratorHopList != cacheEntry->hopList.end()) {
+        string hop = *iteratorHopList;
+        dataMsg->setHopList(i, hop.c_str());
+        iteratorHopList++;
+    }
+
+    send(dataMsg, "lowerLayerOut");
+
+    emit(dataBytesSentSignal, (long) dataMsg->getByteLength());
+    emit(totalBytesSentSignal, (long) dataMsg->getByteLength());
 }
 
 KSummaryVectorMsg* KMaxPropRoutingLayer::makeSummaryVectorMessage()
