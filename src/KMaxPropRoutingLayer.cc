@@ -1110,7 +1110,6 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
 }
 
 
-
 KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbourInfo(string nodeMACAddress)
 {
     // check if sync entry is there
