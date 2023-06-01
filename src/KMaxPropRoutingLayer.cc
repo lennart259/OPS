@@ -430,8 +430,9 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
         syncedNeighbour->nodeConsidered = TRUE;
 
         bool syncWithNeighbour = FALSE;
+        bool isInSync = syncedNeighbour->sendRoutingNext || syncedNeighbour->sendDataNext;
 
-        if (syncedNeighbour->syncCoolOffEndTime >= simTime().dbl()) {
+        if (syncedNeighbour->syncCoolOffEndTime >= simTime().dbl() && not isInSync) {
             // if the sync was done recently, don't sync again until the anti-entropy interval
             // has elapsed
             syncWithNeighbour = FALSE;
