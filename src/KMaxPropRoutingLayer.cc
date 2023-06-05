@@ -468,7 +468,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             if (syncedNeighbour->sendRoutingNext){
                 // phase 2:
                 // todo send routing info and Ack messages
-                EV << "Send Routing / ACK" << "\n";
+                EV << ownMACAddress << ": Send Routing / ACK to nodeMACAddress.c_str()" << "\n";
                 sendRoutingInfoMessage(nodeMACAddress.c_str());
                 syncedNeighbour->sendRoutingNext = FALSE;
                 // syncedNeighbour->sendDataNext = TRUE;
@@ -476,7 +476,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             else if (syncedNeighbour->sendDataNext){
                 // phase 3:
                 // todo send data
-                EV << "Send Data" << "\n";
+                EV << ownMACAddress << ": Send Data to " << nodeMACAddress.c_str() << "\n";
                 sendDataMsgs(nodeMACAddress.c_str());
                 syncedNeighbour->sendDataNext = FALSE;
             }
@@ -629,12 +629,15 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
             cacheEntry->updatedTime = simTime().dbl();
 
             //copy hop list
+             EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << "\n";
+             EV << ownMACAddress << ": now caching. Hop List: \n";
              string hopMac;
              vector<string> selectedMessageIDList;
              int i = 0;
              while (i < omnetDataMsg->getHopListArraySize()) {
                  hopMac = omnetDataMsg->getHopList(i);
                  cacheEntry->hopList.push_back(hopMac);
+                 EV << "Entry " << i << ": " << hopMac;
              }
              // add last hop (source MAC) to hopList
              cacheEntry->hopList.push_back(omnetDataMsg->getSourceAddress());
@@ -688,169 +691,6 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     } else {
         delete msg;
     }
-}
-
-void KMaxPropRoutingLayer::handleSummaryVectorMsgFromLowerLayer(cMessage *msg)
-{
-    KSummaryVectorMsg *summaryVectorMsg = dynamic_cast<KSummaryVectorMsg*>(msg);
-
-    emit(sumVecBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
-    emit(totalBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
-
-    // when a summary vector is received, it means that the neighbour started the syncing
-    // so send the data request message with the required data items
-
-
-    // check and build a list of missing data items
-    string messageID;
-    vector<string> selectedMessageIDList;
-    int i = 0;
-    while (i < summaryVectorMsg->getMessageIDHashVectorArraySize()) {
-        messageID = summaryVectorMsg->getMessageIDHashVector(i);
-
-        // see if data item exist in cache
-        CacheEntry *cacheEntry;
-        list<CacheEntry*>::iterator iteratorCache;
-        bool found = FALSE;
-        iteratorCache = cacheList.begin();
-        while (iteratorCache != cacheList.end()) {
-            cacheEntry = *iteratorCache;
-            if (cacheEntry->messageID == messageID) {
-                found = TRUE;
-                break;
-            }
-
-            iteratorCache++;
-        }
-
-        if (!found) {
-            selectedMessageIDList.push_back(messageID);
-        }
-        i++;
-    }
-
-    // build a KDataRequestMsg with missing data items (i.e.,  message IDs)
-    KDataRequestMsg *dataRequestMsg = new KDataRequestMsg();
-    dataRequestMsg->setSourceAddress(ownMACAddress.c_str());
-    dataRequestMsg->setDestinationAddress(summaryVectorMsg->getSourceAddress());
-    int realPacketSize = 6 + 6 + (selectedMessageIDList.size() * KMAXPROPROUTINGLAYER_MSG_ID_HASH_SIZE);
-    dataRequestMsg->setRealPacketSize(realPacketSize);
-    dataRequestMsg->setByteLength(realPacketSize);
-    dataRequestMsg->setMessageIDHashVectorArraySize(selectedMessageIDList.size());
-    i = 0;
-    vector<string>::iterator iteratorMessageIDList;
-    iteratorMessageIDList = selectedMessageIDList.begin();
-    while (iteratorMessageIDList != selectedMessageIDList.end()) {
-        messageID = *iteratorMessageIDList;
-
-        dataRequestMsg->setMessageIDHashVector(i, messageID.c_str());
-
-        i++;
-        iteratorMessageIDList++;
-    }
-
-    send(dataRequestMsg, "lowerLayerOut");
-
-    emit(dataReqBytesSentSignal, (long) dataRequestMsg->getByteLength());
-    emit(totalBytesSentSignal, (long) dataRequestMsg->getByteLength());
-
-
-    // cancel the random backoff timer (because neighbour started syncing)
-    string nodeMACAddress = summaryVectorMsg->getSourceAddress();
-    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
-    syncedNeighbour->randomBackoffStarted = FALSE;
-    syncedNeighbour->randomBackoffEndTime = 0.0;
-
-    // second - start wait timer until neighbour has finished syncing
-    syncedNeighbour->neighbourSyncing = TRUE;
-    double delayPerDataMessage = 0.5; // assume 500 milli seconds per data message
-    syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (selectedMessageIDList.size() * delayPerDataMessage);
-
-    // synched neighbour list must be updated in next round
-    // as there were changes
-    syncedNeighbourListIHasChanged = TRUE;
-
-
-    delete msg;
-}
-
-void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
-{
-    KDataRequestMsg *dataRequestMsg = dynamic_cast<KDataRequestMsg*>(msg);
-
-    emit(dataReqBytesReceivedSignal, (long) dataRequestMsg->getByteLength());
-    emit(totalBytesReceivedSignal, (long) dataRequestMsg->getByteLength());
-
-    int i = 0;
-    while (i < dataRequestMsg->getMessageIDHashVectorArraySize()) {
-        string messageID = dataRequestMsg->getMessageIDHashVector(i);
-
-        CacheEntry *cacheEntry;
-        list<CacheEntry*>::iterator iteratorCache;
-        bool found = FALSE;
-        iteratorCache = cacheList.begin();
-        while (iteratorCache != cacheList.end()) {
-            cacheEntry = *iteratorCache;
-            if (cacheEntry->messageID == messageID) {
-                found = TRUE;
-                break;
-            }
-
-            iteratorCache++;
-        }
-
-        if (found) {
-
-            KDataMsg *dataMsg = new KDataMsg();
-
-            dataMsg->setSourceAddress(ownMACAddress.c_str());
-            dataMsg->setDestinationAddress(dataRequestMsg->getSourceAddress());
-            dataMsg->setDataName(cacheEntry->dataName.c_str());
-            dataMsg->setDummyPayloadContent(cacheEntry->dummyPayloadContent.c_str());
-            dataMsg->setValidUntilTime(cacheEntry->validUntilTime);
-            dataMsg->setRealPayloadSize(cacheEntry->realPayloadSize);
-            // check KOPSMsg.msg on sizing mssages
-            int realPacketSize = 6 + 6 + 2 + cacheEntry->realPayloadSize + 4 + 6 + 1;
-            dataMsg->setRealPacketSize(realPacketSize);
-            dataMsg->setByteLength(realPacketSize);
-            dataMsg->setInitialOriginatorAddress(cacheEntry->initialOriginatorAddress.c_str());
-            dataMsg->setDestinationOriented(cacheEntry->destinationOriented);
-            if (cacheEntry->destinationOriented) {
-                dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
-            }
-            dataMsg->setMessageID(cacheEntry->messageID.c_str());
-            dataMsg->setHopCount(cacheEntry->hopCount);
-            dataMsg->setGoodnessValue(cacheEntry->goodnessValue);
-            dataMsg->setHopsTravelled(cacheEntry->hopsTravelled);
-            dataMsg->setMsgUniqueID(cacheEntry->msgUniqueID);
-            dataMsg->setInitialInjectionTime(cacheEntry->initialInjectionTime);
-
-            send(dataMsg, "lowerLayerOut");
-
-            emit(dataBytesSentSignal, (long) dataMsg->getByteLength());
-            emit(totalBytesSentSignal, (long) dataMsg->getByteLength());
-
-
-            ///Fix 2: remove cache entry after sending to destination
-            if (strstr(cacheEntry->finalDestinationAddress.c_str(), dataRequestMsg->getSourceAddress()) != NULL
-                    && cacheEntry->destinationOriented) {
-
-                currentCacheSize -= cacheEntry->realPacketSize;
-
-                emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
-                emit(currentCacheSizeBytesSignal, currentCacheSize);
-                emit(currentCacheSizeReportedCountSignal, (int) 1);
-
-                emit(currentCacheSizeBytesSignal2, currentCacheSize);
-
-                cacheList.erase(iteratorCache);
-                delete cacheEntry;
-            }
-        }
-
-        i++;
-    }
-    delete msg;
 }
 
 
@@ -984,12 +824,14 @@ void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
         if(ackCacheEntry->ttl == 0) { // erase from own ACK list if ttl is expired
             ackCacheList.erase(iteratorAckCache);
         }
+        if(ackCacheList.size()==0) {break;}
 
         iteratorAckCache++;
         i++;
         //EV << "Ack cache entry: " << i << " has ttl of: " << ackCacheEntry->ttl;
     }
     send(ackMsg, "lowerLayerOut");
+    EV << ownMACAddress << ": Ack vector msg was sent to: " << destinationAddress << "\n";
 
 }
 
@@ -1011,7 +853,7 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
 
     // 0. Extract data from the message
     string nodeBMacAddress = routingInfoMsg->getSourceAddress();
-    EV << "RoutingInfo arrived at node: " << ownMACAddress << " !!!";
+    EV << ownMACAddress << ": RoutingInfo was received from: " << nodeBMacAddress << "\n";
 
     // create new RoutingInfo object which we get out of the message
     RoutingInfo nodeBRoutingInfo;
@@ -1062,18 +904,20 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
         newPL.nodeMACAddress = nodeBMacAddress;
         newPL.likelihood = 1.0;
         routingInfoList[0].peerLikelihoods.push_back(newPL);
-        EV << "we added new peer to own peerLikelihood list \n";
+        EV << ownMACAddress << ": we added new peer to own peerLikelihood list \n";
     }
 
     // only re-normalize, if the added entry was not the first one.
-    EV << "Re-normalizing the local peerLikelihood list for node: " << ownMACAddress;
     totalSizePl = routingInfoList[0].peerLikelihoods.size();
     if(totalSizePl > 1 || found) {
+        EV << ownMACAddress <<": Re-normalizing the local peerLikelihood list. \n";
         for(indexPl = 0; indexPl != totalSizePl; indexPl++) {
             routingInfoList[0].peerLikelihoods[indexPl].likelihood /= 2.0;
-            EV << "Node: " << routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress << ", likelihood: " << routingInfoList[0].peerLikelihoods[indexPl].likelihood << "\n";
-
+            EV << ownMACAddress << ": Node: " << routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress << ", likelihood: " << routingInfoList[0].peerLikelihoods[indexPl].likelihood << "\n";
         }
+    }
+    else {
+        EV << ownMACAddress << ": Node: " << routingInfoList[0].peerLikelihoods[0].nodeMACAddress << ", likelihood: " << routingInfoList[0].peerLikelihoods[0].likelihood << "\n";
     }
 
     // Proceed with sync Process
@@ -1099,6 +943,8 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
  *
  * */
 void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
+
+
     KRoutingInfoMsg *routingInfoMsg = new KRoutingInfoMsg();
 
     vector<PeerLikelihood>::size_type totalSizePl = routingInfoList[0].peerLikelihoods.size();
@@ -1114,7 +960,7 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
         routingInfoMsg->setPeerLikelihoods(indexPl, pL);
     }
     send(routingInfoMsg, "lowerLayerOut");
-
+    EV << ownMACAddress << ": routing info was sent to: " << destinationAddress << "\n";
 }
 
 // comparison, based on hopsTravelled
@@ -1414,3 +1260,167 @@ void KMaxPropRoutingLayer::finish()
     delete cacheSizeReportingTimeoutEvent;
 
 }
+
+void KMaxPropRoutingLayer::handleSummaryVectorMsgFromLowerLayer(cMessage *msg)
+{
+    KSummaryVectorMsg *summaryVectorMsg = dynamic_cast<KSummaryVectorMsg*>(msg);
+
+    emit(sumVecBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
+    emit(totalBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
+
+    // when a summary vector is received, it means that the neighbour started the syncing
+    // so send the data request message with the required data items
+
+
+    // check and build a list of missing data items
+    string messageID;
+    vector<string> selectedMessageIDList;
+    int i = 0;
+    while (i < summaryVectorMsg->getMessageIDHashVectorArraySize()) {
+        messageID = summaryVectorMsg->getMessageIDHashVector(i);
+
+        // see if data item exist in cache
+        CacheEntry *cacheEntry;
+        list<CacheEntry*>::iterator iteratorCache;
+        bool found = FALSE;
+        iteratorCache = cacheList.begin();
+        while (iteratorCache != cacheList.end()) {
+            cacheEntry = *iteratorCache;
+            if (cacheEntry->messageID == messageID) {
+                found = TRUE;
+                break;
+            }
+
+            iteratorCache++;
+        }
+
+        if (!found) {
+            selectedMessageIDList.push_back(messageID);
+        }
+        i++;
+    }
+
+    // build a KDataRequestMsg with missing data items (i.e.,  message IDs)
+    KDataRequestMsg *dataRequestMsg = new KDataRequestMsg();
+    dataRequestMsg->setSourceAddress(ownMACAddress.c_str());
+    dataRequestMsg->setDestinationAddress(summaryVectorMsg->getSourceAddress());
+    int realPacketSize = 6 + 6 + (selectedMessageIDList.size() * KMAXPROPROUTINGLAYER_MSG_ID_HASH_SIZE);
+    dataRequestMsg->setRealPacketSize(realPacketSize);
+    dataRequestMsg->setByteLength(realPacketSize);
+    dataRequestMsg->setMessageIDHashVectorArraySize(selectedMessageIDList.size());
+    i = 0;
+    vector<string>::iterator iteratorMessageIDList;
+    iteratorMessageIDList = selectedMessageIDList.begin();
+    while (iteratorMessageIDList != selectedMessageIDList.end()) {
+        messageID = *iteratorMessageIDList;
+
+        dataRequestMsg->setMessageIDHashVector(i, messageID.c_str());
+
+        i++;
+        iteratorMessageIDList++;
+    }
+
+    send(dataRequestMsg, "lowerLayerOut");
+
+    emit(dataReqBytesSentSignal, (long) dataRequestMsg->getByteLength());
+    emit(totalBytesSentSignal, (long) dataRequestMsg->getByteLength());
+
+
+    // cancel the random backoff timer (because neighbour started syncing)
+    string nodeMACAddress = summaryVectorMsg->getSourceAddress();
+    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
+    syncedNeighbour->randomBackoffStarted = FALSE;
+    syncedNeighbour->randomBackoffEndTime = 0.0;
+
+    // second - start wait timer until neighbour has finished syncing
+    syncedNeighbour->neighbourSyncing = TRUE;
+    double delayPerDataMessage = 0.5; // assume 500 milli seconds per data message
+    syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (selectedMessageIDList.size() * delayPerDataMessage);
+
+    // synched neighbour list must be updated in next round
+    // as there were changes
+    syncedNeighbourListIHasChanged = TRUE;
+
+
+    delete msg;
+}
+
+void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
+{
+    KDataRequestMsg *dataRequestMsg = dynamic_cast<KDataRequestMsg*>(msg);
+
+    emit(dataReqBytesReceivedSignal, (long) dataRequestMsg->getByteLength());
+    emit(totalBytesReceivedSignal, (long) dataRequestMsg->getByteLength());
+
+    int i = 0;
+    while (i < dataRequestMsg->getMessageIDHashVectorArraySize()) {
+        string messageID = dataRequestMsg->getMessageIDHashVector(i);
+
+        CacheEntry *cacheEntry;
+        list<CacheEntry*>::iterator iteratorCache;
+        bool found = FALSE;
+        iteratorCache = cacheList.begin();
+        while (iteratorCache != cacheList.end()) {
+            cacheEntry = *iteratorCache;
+            if (cacheEntry->messageID == messageID) {
+                found = TRUE;
+                break;
+            }
+
+            iteratorCache++;
+        }
+
+        if (found) {
+
+            KDataMsg *dataMsg = new KDataMsg();
+
+            dataMsg->setSourceAddress(ownMACAddress.c_str());
+            dataMsg->setDestinationAddress(dataRequestMsg->getSourceAddress());
+            dataMsg->setDataName(cacheEntry->dataName.c_str());
+            dataMsg->setDummyPayloadContent(cacheEntry->dummyPayloadContent.c_str());
+            dataMsg->setValidUntilTime(cacheEntry->validUntilTime);
+            dataMsg->setRealPayloadSize(cacheEntry->realPayloadSize);
+            // check KOPSMsg.msg on sizing mssages
+            int realPacketSize = 6 + 6 + 2 + cacheEntry->realPayloadSize + 4 + 6 + 1;
+            dataMsg->setRealPacketSize(realPacketSize);
+            dataMsg->setByteLength(realPacketSize);
+            dataMsg->setInitialOriginatorAddress(cacheEntry->initialOriginatorAddress.c_str());
+            dataMsg->setDestinationOriented(cacheEntry->destinationOriented);
+            if (cacheEntry->destinationOriented) {
+                dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
+            }
+            dataMsg->setMessageID(cacheEntry->messageID.c_str());
+            dataMsg->setHopCount(cacheEntry->hopCount);
+            dataMsg->setGoodnessValue(cacheEntry->goodnessValue);
+            dataMsg->setHopsTravelled(cacheEntry->hopsTravelled);
+            dataMsg->setMsgUniqueID(cacheEntry->msgUniqueID);
+            dataMsg->setInitialInjectionTime(cacheEntry->initialInjectionTime);
+
+            send(dataMsg, "lowerLayerOut");
+
+            emit(dataBytesSentSignal, (long) dataMsg->getByteLength());
+            emit(totalBytesSentSignal, (long) dataMsg->getByteLength());
+
+
+            ///Fix 2: remove cache entry after sending to destination
+            if (strstr(cacheEntry->finalDestinationAddress.c_str(), dataRequestMsg->getSourceAddress()) != NULL
+                    && cacheEntry->destinationOriented) {
+
+                currentCacheSize -= cacheEntry->realPacketSize;
+
+                emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
+                emit(currentCacheSizeBytesSignal, currentCacheSize);
+                emit(currentCacheSizeReportedCountSignal, (int) 1);
+
+                emit(currentCacheSizeBytesSignal2, currentCacheSize);
+
+                cacheList.erase(iteratorCache);
+                delete cacheEntry;
+            }
+        }
+
+        i++;
+    }
+    delete msg;
+}
+
