@@ -28,7 +28,6 @@ void KMaxPropRoutingLayer::initialize(int stage)
         usedRNG = par("usedRNG");
         cacheSizeReportingFrequency = par("cacheSizeReportingFrequency");
         numEventsHandled = 0;
-        ackHopsToLive = par("ackHopsToLive");
         TimePerPacket = par("TimePerPacket");
         ackTtl = par("ackTtl");
 
@@ -468,7 +467,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             if (syncedNeighbour->sendRoutingNext){
                 // phase 2:
                 // todo send routing info and Ack messages
-                EV << ownMACAddress << ": Send Routing / ACK to nodeMACAddress.c_str()" << "\n";
+                EV << ownMACAddress << ": Call sendRoutingInfoMessage from Neighbour handling, send to " << nodeMACAddress << "\n";
                 sendRoutingInfoMessage(nodeMACAddress.c_str());
                 syncedNeighbour->sendRoutingNext = FALSE;
                 // syncedNeighbour->sendDataNext = TRUE;
@@ -501,10 +500,13 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 // todo phase detection
                 // phase 1:
                 // todo send packets destined to the neighbor
+                EV << ownMACAddress << ": call sendDataDestinedToNeighbor(), send to " << nodeMACAddress << "\n";
                 int numMsg = sendDataDestinedToNeighbor(nodeMACAddress);
                 // todo if function: maximumRandomBackoffDuration only if numMsg==0 ???
+                if (numMsg == 0)
+                    EV << ownMACAddress << ": no messages in cache for peer " << nodeMACAddress << "\n";
                 syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (numMsg+1)*TimePerPacket + maximumRandomBackoffDuration;
-                EV << "Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
+                EV << ownMACAddress << ": Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
                 syncedNeighbour->neighbourSyncing = TRUE;
 
                 // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
@@ -630,21 +632,23 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 
             //copy hop list
              EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << "\n";
-             EV << ownMACAddress << ": now caching. Hop List: \n";
+             EV << ownMACAddress << ": now caching new data; Hop List: \n";
              string hopMac;
              vector<string> selectedMessageIDList;
              int i = 0;
              while (i < omnetDataMsg->getHopListArraySize()) {
                  hopMac = omnetDataMsg->getHopList(i);
                  cacheEntry->hopList.push_back(hopMac);
-                 EV << "Entry " << i << ": " << hopMac;
+                 EV << "Entry " << i << ": " << hopMac << "\n";
+                 i++;
              }
              // add last hop (source MAC) to hopList
              cacheEntry->hopList.push_back(omnetDataMsg->getSourceAddress());
+            EV << "Newest Entry " << (i+1) << ": " << omnetDataMsg->getSourceAddress() << " added to message " << omnetDataMsg->getMsgUniqueID() << "\n";
 
-            cacheList.push_back(cacheEntry);
+             cacheList.push_back(cacheEntry);
 
-            currentCacheSize += cacheEntry->realPayloadSize;
+             currentCacheSize += cacheEntry->realPayloadSize;
 
         }
 
@@ -682,10 +686,29 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     if (found) {
         send(msg, "upperLayerOut");
         // create new ACK message and store in own cache.
-        Ack *newAckCacheEntry = new Ack();
-        newAckCacheEntry->msgUniqueID = omnetDataMsg->getMsgUniqueID();
-        newAckCacheEntry->ttl = ackTtl;
-        ackCacheList.push_back(newAckCacheEntry);
+        // only add ack if its not already in cache (we can receive the same message several times)
+        Ack *ackCacheEntry;
+        list<Ack*>::iterator iteratorAckCache;
+        bool found = FALSE;
+        iteratorAckCache = ackCacheList.begin();
+        while (iteratorAckCache != ackCacheList.end()) {
+            ackCacheEntry = *iteratorAckCache;
+            if (ackCacheEntry->msgUniqueID == omnetDataMsg->getMsgUniqueID()) {
+                found = TRUE;
+                break;
+            }
+
+            iteratorAckCache++;
+        }
+        if (!found) {
+            Ack *newAckCacheEntry = new Ack();
+            newAckCacheEntry->msgUniqueID = omnetDataMsg->getMsgUniqueID();
+            newAckCacheEntry->ttl = ackTtl;
+            ackCacheList.push_back(newAckCacheEntry);
+            EV << ownMACAddress << ": Added new ACK for message " << newAckCacheEntry->msgUniqueID << " to cache, with ttl of " << newAckCacheEntry->ttl << "\n";
+        }
+        else
+            EV << ownMACAddress << ": Multiply received message: ACK is already in cache \n";
 
 
     } else {
@@ -711,6 +734,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     //emit(ackBytesReceivedSignal, (long) ackMsg->getByteLength());
     emit(totalBytesReceivedSignal, (long) ackMsg->getByteLength());
 
+    EV << ownMACAddress << ": received ACK vector message from " << ackMsg->getSourceAddress() << "\n";
     // go through all Acks in Ack List
     for(int i = 0 ; i < ackMsg->getAckListArraySize() ; i++) {
 
@@ -732,7 +756,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
             iteratorAckCache++;
         }
         if (!found) {
-
+            EV << ownMACAddress << ": Stored ACK for MsgID: " << msgUniqueIDAckd << "\n";
             // store ACK to propagate further
             // store ack'd ID in local cache
             // ack with ttl = 0 will not be stored, but we still search our cache once, if we find the ack'd package
@@ -754,11 +778,11 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
                     found = TRUE;
                     break;
                 }
-
                 iteratorCache++;
             }
             // delete delivered (ack'd) cache entry
             if (found) {
+                EV << ownMACAddress << ": Found ACK'd message in own Cache... \n";
                 currentCacheSize -= cacheEntry->realPacketSize;
 
                 emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
@@ -768,8 +792,10 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
                 emit(currentCacheSizeBytesSignal2, currentCacheSize);
 
                 cacheList.erase(iteratorCache);
+                EV << ownMACAddress << ": Deleted message from cache, ID: " << msgUniqueIDAckd << " \n";
                 delete cacheEntry;
             }
+
         }
     }
 
@@ -786,6 +812,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
     else{
         // routing info is send, but sendDataNext is False
         // -> we did not send Ack Vector so we send it now
+        EV << ownMACAddress << ": Call sendAckVectorMessage from handleAckVectorMessage, send to " << nodeBMacAddress << "\n";
         sendAckVectorMessage(nodeBMacAddress.c_str());
         syncedNeighbour->sendDataNext = TRUE;
     }
@@ -816,19 +843,26 @@ void KMaxPropRoutingLayer::sendAckVectorMessage(string destinationAddress) {
     iteratorAckCache = ackCacheList.begin();
     int i = 0;
     // reduce ttl in local Cache and add local cache entry to KAckMessage
+    if(iteratorAckCache != ackCacheList.end())
+        EV << ownMACAddress << ": Decrease ACK ttl before sending ACK Vector \n";
+    else
+        EV << ownMACAddress << ": Sending empty ACK Vector \n";
+
     while (iteratorAckCache != ackCacheList.end()) {
         ackCacheEntry = *iteratorAckCache;
         ackCacheEntry->ttl -= 1;
         ackMsg->setAckList(i, *ackCacheEntry);
 
         if(ackCacheEntry->ttl == 0) { // erase from own ACK list if ttl is expired
-            ackCacheList.erase(iteratorAckCache);
+            EV << "Removing Ack cache entry " << i << " from cache, for msg " << ackCacheEntry->msgUniqueID << " with ttl of: " << ackCacheEntry->ttl << "\n";
+            ackCacheList.erase(iteratorAckCache++);
         }
-        if(ackCacheList.size()==0) {break;}
+        else
+            iteratorAckCache++;
 
-        iteratorAckCache++;
+        if(ackCacheList.size()==0) {break;}
         i++;
-        //EV << "Ack cache entry: " << i << " has ttl of: " << ackCacheEntry->ttl;
+        EV << "Ack cache entry: " << i << " for msg " << ackCacheEntry->msgUniqueID << " has ttl of: " << ackCacheEntry->ttl << "\n";
     }
     send(ackMsg, "lowerLayerOut");
     EV << ownMACAddress << ": Ack vector msg was sent to: " << destinationAddress << "\n";
@@ -920,14 +954,17 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
         EV << ownMACAddress << ": Node: " << routingInfoList[0].peerLikelihoods[0].nodeMACAddress << ", likelihood: " << routingInfoList[0].peerLikelihoods[0].likelihood << "\n";
     }
 
+
     // Proceed with sync Process
     SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress.c_str());
     if (syncedNeighbour->sendRoutingNext){
+        EV << ownMACAddress << ": Call sendRoutingInfoMessage from handleRoutingInfoMessage, send to " << nodeBMacAddress << "\n";
         sendRoutingInfoMessage(nodeBMacAddress.c_str());
         syncedNeighbour->sendRoutingNext = FALSE;
     }
     else{
         //
+        EV << ownMACAddress << ": Call sendAckVectorMessage from handleRoutingInfoMessage, send to " << nodeBMacAddress << "\n";
         sendAckVectorMessage(nodeBMacAddress.c_str());
         syncedNeighbour->sendDataNext = TRUE;
     }
@@ -958,6 +995,8 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
         pL.nodeMACAddress = routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress;
         pL.likelihood = routingInfoList[0].peerLikelihoods[indexPl].likelihood;
         routingInfoMsg->setPeerLikelihoods(indexPl, pL);
+        EV << "MAC: " << pL.nodeMACAddress << "\n";
+        EV << "PL : " << pL.likelihood << "\n";
     }
     send(routingInfoMsg, "lowerLayerOut");
     EV << ownMACAddress << ": routing info was sent to: " << destinationAddress << "\n";
@@ -1079,6 +1118,7 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
 void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 {
     // sort Buffer
+    EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
     sortBuffer(0);   // 0: sort by hopcount
 
     // iterate through the whole cacheList
@@ -1086,23 +1126,32 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
     list<CacheEntry*>::iterator iteratorCache;
     bool found = FALSE;
     iteratorCache = cacheList.begin();
+
+    if(iteratorCache != cacheList.end())
+        EV << ownMACAddress << ": sendDataMsgs(): start iterating through cache. \n";
+    else
+        EV << ownMACAddress << ": sendDataMsgs(): cache is empty, no data to send. \n";
+
+    int n = 0;
     while (iteratorCache != cacheList.end()) {
         cacheEntry = *iteratorCache;
 
         // iterate through the hop_list of the current message to find, if the packet should be sent to current neighbor
-
+        n++;
+        EV << "CacheEntry " << n << "; HopCount: " << cacheEntry->hopCount << "\n";
         list<string>::iterator iteratorHopList;
         bool found = FALSE;
         iteratorHopList = cacheEntry->hopList.begin();
         while (iteratorHopList != cacheEntry->hopList.end()) {
             if(iteratorHopList->c_str() == destinationAddress) {
+                EV << ownMACAddress << ": Neighbour " << destinationAddress << " is already in the hop list of message " << cacheEntry->msgUniqueID << "\n";
                 found = TRUE;
                 break;
             }
         }
 
         if(!found) { // only send data message if neighbor was not found in hopList
-
+            EV << ownMACAddress << ": Neighbour not found in hop list, sending data to " << destinationAddress << "\n";
             createAndSendDataMessage(cacheEntry, destinationAddress);
         }
 
@@ -1132,13 +1181,15 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
             createAndSendDataMessage(cacheEntry, destinationAddress);
             sentMessages++;
             // remove the cache entry from cache.
-            cacheList.erase(iteratorCache);
+            cacheList.erase(iteratorCache++);
             delete cacheEntry;
         }
-        if (cacheList.size()==0){break;}
-        iteratorCache ++;
-    }
+        else
+            iteratorCache ++;
 
+        if (cacheList.size()==0){break;}
+
+    }
     return sentMessages;
 }
 

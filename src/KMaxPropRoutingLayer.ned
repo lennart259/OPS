@@ -39,7 +39,6 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
 
 		// number of hops to propagate an ACK before it is deleted.
 		int ackTtl = default(maximumHopCount);
-		int ackHopsToLive;
 		
 		// time needed to transfer a data packet
 		int bytesMsg;
