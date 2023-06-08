@@ -1131,7 +1131,6 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
         EV << ownMACAddress << ": sendDataMsgs(): start iterating through cache. \n";
     else
         EV << ownMACAddress << ": sendDataMsgs(): cache is empty, no data to send. \n";
-
     int n = 0;
     while (iteratorCache != cacheList.end()) {
         cacheEntry = *iteratorCache;
@@ -1148,6 +1147,7 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
                 found = TRUE;
                 break;
             }
+            iteratorHopList++;
         }
 
         if(!found) { // only send data message if neighbor was not found in hopList
