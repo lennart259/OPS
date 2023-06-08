@@ -1182,7 +1182,7 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
             sentMessages++;
             // remove the cache entry from cache.
             cacheList.erase(iteratorCache++);
-            delete cacheEntry;
+            delete cacheEntry; // todo?! why delete here
         }
         else
             iteratorCache ++;
@@ -1238,7 +1238,6 @@ void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, stri
 
 KSummaryVectorMsg* KMaxPropRoutingLayer::makeSummaryVectorMessage()
 {
-
     // identify the entries of the summary vector
     vector<string> selectedMessageIDList;
     CacheEntry *cacheEntry;
@@ -1249,7 +1248,6 @@ KSummaryVectorMsg* KMaxPropRoutingLayer::makeSummaryVectorMessage()
         if ((cacheEntry->hopCount + 1) < maximumHopCount) {
             selectedMessageIDList.push_back(cacheEntry->messageID);
         }
-
         iteratorCache++;
     }
 
@@ -1279,7 +1277,6 @@ void KMaxPropRoutingLayer::finish()
 {
 
     recordScalar("numEventsHandled", numEventsHandled);
-
 
     // clear resgistered app list
     while (registeredAppList.size() > 0) {
