@@ -91,7 +91,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
             double updatedTime;
             double lastAccessedTime;
 
-            list<string> hopList;
+            list<int> hopList;
         };
 
         struct SyncedNeighbour {

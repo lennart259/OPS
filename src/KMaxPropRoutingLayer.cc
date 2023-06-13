@@ -664,18 +664,18 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
             //copy hop list
              EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << "\n";
              EV << ownMACAddress << ": now caching new data; Hop List: \n";
-             string hopMac;
+             int hopIndex;
              vector<string> selectedMessageIDList;
              int i = 0;
              while (i < omnetDataMsg->getHopListArraySize()) {
-                 hopMac = omnetDataMsg->getHopList(i);
-                 cacheEntry->hopList.push_back(hopMac);
-                 EV << "Entry " << i << ": " << hopMac << "\n";
+                 hopIndex = omnetDataMsg->getHopList(i);
+                 cacheEntry->hopList.push_back(hopIndex);
+                 EV << "Entry " << i << ": " << hopIndex << "\n";
                  i++;
              }
              // add last hop (source MAC) to hopList
-             cacheEntry->hopList.push_back(omnetDataMsg->getSourceAddress());
-            EV << "Newest Entry " << (i+1) << ": " << omnetDataMsg->getSourceAddress() << " added to message " << omnetDataMsg->getMsgUniqueID() << "\n";
+             cacheEntry->hopList.push_back(macAddressToNodeIndex(omnetDataMsg->getSourceAddress()));
+             EV << "Newest Entry " << (i) << ": " << macAddressToNodeIndex(omnetDataMsg->getSourceAddress()) << " added to message " << omnetDataMsg->getMsgUniqueID() << "\n";
 
              cacheList.push_back(cacheEntry);
 
@@ -1179,11 +1179,12 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
         // iterate through the hop_list of the current message to find, if the packet should be sent to current neighbor
         n++;
         EV << "CacheEntry " << n << "; HopCount: " << cacheEntry->hopCount << "\n";
-        list<string>::iterator iteratorHopList;
+        int destinationNodeIndex = macAddressToNodeIndex(destinationAddress);
+        list<int>::iterator iteratorHopList;
         bool found = FALSE;
         iteratorHopList = cacheEntry->hopList.begin();
         while (iteratorHopList != cacheEntry->hopList.end()) {
-            if(iteratorHopList->c_str() == destinationAddress) {
+            if(*iteratorHopList == destinationNodeIndex) {
                 EV << ownMACAddress << ": Neighbour " << destinationAddress << " is already in the hop list of message " << cacheEntry->msgUniqueID << "\n";
                 found = TRUE;
                 break;
@@ -1264,13 +1265,14 @@ void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, stri
     // hop list: create array in message from list in cache entry
     dataMsg->setHopListArraySize(cacheEntry->hopList.size());
 
-    list<string>::iterator iteratorHopList;
+    list<int>::iterator iteratorHopList;
     iteratorHopList = cacheEntry->hopList.begin();
     int i = 0;
     while (iteratorHopList != cacheEntry->hopList.end()) {
-        string hop = *iteratorHopList;
-        dataMsg->setHopList(i, hop.c_str());
+        int hop = *iteratorHopList;
+        dataMsg->setHopList(i, hop);
         iteratorHopList++;
+        i++;
     }
 
     send(dataMsg, "lowerLayerOut");
