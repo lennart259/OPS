@@ -1051,10 +1051,46 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
     EV << ownMACAddress << ": routing info was sent to: " << destinationAddress << "\n";
 }
 
-double KMaxPropRoutingLayer::computeDeliveryLikelihood(int destinationNodeIndex){
-    return 0.0;
+
+/***********************computePathCostsToFinalDest()***************************
+ * computes the path cost to the final destination for all messages in cache,
+ * upon meeting a neighbor
+ * The delivery likelihood is stored as pathCost in the cacheEntries.
+ */
+void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
+// iterate through cache. For each message look at their final destination,
+// and compute the lowest path cost, if there are several possible paths starting with
+// the current neighbour neighbourNodeIndex.
+
+    CacheEntry *cacheEntry;
+    list<CacheEntry*>::iterator iteratorCache;
+    bool found = FALSE;
+    iteratorCache = cacheList.begin();
+
+    if(iteratorCache != cacheList.end())
+        EV << ownMACAddress << ": computePathCosts: start iterating through cache. \n";
+    else
+        EV << ownMACAddress << ": computePathCosts: cache is empty. \n";
+    int n = 0;
+    while (iteratorCache != cacheList.end()) {
+        cacheEntry = *iteratorCache;
+
+        cacheEntry->pathCost = computePathCost(neighbourNodeIndex, cacheEntry->finalDestinationNodeIndex);
+
+        iteratorCache++;
+    }
+
 }
 
+/************************+computePathCost()****************************
+ * uses the routing info list to compute the lowest path cost from startNodeIndex to destinationNodeIndex.
+ * If the current routing info does not contain a possible path (destinationNodeIndex has never been seen),
+ * the function will return the highest possible double value.
+ *
+ */
+double KMaxPropRoutingLayer::computePathCost(int startNodeIndex, int destinationNodeIndex){
+    return std::numeric_limits<double>::max();
+}
 
 // comparison, based on hopsTravelled
 bool KMaxPropRoutingLayer::compare_hopcount (const CacheEntry *first, const CacheEntry *second)
@@ -1062,11 +1098,17 @@ bool KMaxPropRoutingLayer::compare_hopcount (const CacheEntry *first, const Cach
   return ( first->hopsTravelled < second->hopsTravelled );
 }
 
+// comparison, based on pathCost
+bool KMaxPropRoutingLayer::compare_pathcost (const CacheEntry *first, const CacheEntry *second)
+{
+  return ( first->pathCost < second->pathCost );
+}
+
 /********************sortBuffer()**************************
  *
  * sort the local buffer (cacheList) by criterion:
  * mode = 0: only hopcount
- * todo: mode = 1: only peerLikelihood
+ * mode = 1: only peerLikelihood
  * todo: mode = 2: maxprop: split the buffer, first half is sorted by hopcount, 2nd half
  * is by peer likelihood, the splitpoint is dynamic.
  * */
@@ -1075,6 +1117,8 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
     case 0: // sort only by hopcount
         cacheList.sort(compare_hopcount);
         break;
+    case 1:
+        cacheList.sort(compare_pathcost);
     default:
         break;
     }
@@ -1152,7 +1196,6 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     iteratorSyncedNeighbour = syncedNeighbourList.begin();
     while (iteratorSyncedNeighbour != syncedNeighbourList.end()) {
         SyncedNeighbour *syncedNeighbour = *iteratorSyncedNeighbour;
-
         syncedNeighbour->randomBackoffStarted = FALSE;
         syncedNeighbour->randomBackoffEndTime = 0.0;
         syncedNeighbour->neighbourSyncing = FALSE;
@@ -1171,9 +1214,13 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
  * */
 void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 {
+    // compute and store pathCosts for all messages in buffer for the current neighbor
+    computePathCostsToFinalDest(macAddressToNodeIndex(destinationAddress));
+
     // sort Buffer
     EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
     sortBuffer(0);   // 0: sort by hopcount
+
 
     // iterate through the whole cacheList
     CacheEntry *cacheEntry;
@@ -1191,14 +1238,14 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 
         // iterate through the hop_list of the current message to find, if the packet should be sent to current neighbor
         n++;
-        EV << "CacheEntry " << n << "; HopCount: " << cacheEntry->hopCount << "\n";
+        EV << "CacheEntry#" << n << ": msg#: " << cacheEntry->msgUniqueID << "; HopCount: " << cacheEntry->hopCount << " PathCost: " << cacheEntry->pathCost << "\n";
         int destinationNodeIndex = macAddressToNodeIndex(destinationAddress);
         list<int>::iterator iteratorHopList;
         bool found = FALSE;
         iteratorHopList = cacheEntry->hopList.begin();
         while (iteratorHopList != cacheEntry->hopList.end()) {
             if(*iteratorHopList == destinationNodeIndex) {
-                EV << ownMACAddress << ": Neighbour " << destinationAddress << " is already in the hop list of message " << cacheEntry->msgUniqueID << "\n";
+                EV << "    " << ownMACAddress << ": Neighbour " << destinationAddress << " is already in the hop list of message " << cacheEntry->msgUniqueID << "\n";
                 found = TRUE;
                 break;
             }
@@ -1206,7 +1253,7 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
         }
 
         if(!found) { // only send data message if neighbor was not found in hopList
-            EV << ownMACAddress << ": Neighbour not found in hop list, sending data to " << destinationAddress << "\n";
+            EV << "    " << ownMACAddress << ": Neighbour not found in hop list, sending data to " << destinationAddress << "\n";
             createAndSendDataMessage(cacheEntry, destinationAddress);
         }
 
@@ -1266,7 +1313,7 @@ void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, stri
     if (cacheEntry->destinationOriented) {
         dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
         dataMsg->setFinalDestinationNodeIndex(cacheEntry->finalDestinationNodeIndex);
-        EV << ownMACAddress << ": sending Message with destination MAC: " << dataMsg->getFinalDestinationAddress() << " and node Index " << dataMsg->getFinalDestinationNodeIndex() << "\n";
+        //EV << ownMACAddress << ": sending Message with destination MAC: " << dataMsg->getFinalDestinationAddress() << " and node Index " << dataMsg->getFinalDestinationNodeIndex() << "\n";
     }
     dataMsg->setMessageID(cacheEntry->messageID.c_str());
     dataMsg->setHopCount(cacheEntry->hopCount);

@@ -91,6 +91,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
             double updatedTime;
             double lastAccessedTime;
 
+            double pathCost; // used for sorting the cache
             list<int> hopList;
         };
 
@@ -166,9 +167,11 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void sendDataMsgs(string nodeMACAddress);
         void createAndSendDataMessage(CacheEntry *cacheEntry, string destinationAddress);
         int macAddressToNodeIndex(string macAddress);
-        double computeDeliveryLikelihood(int destinationNodeIndex);
+        void computePathCostsToFinalDest(int neighbourNodeIndex);
+        double computePathCost(int startNodeIndex, int destinationNodeIndex);
         void sortBuffer(int mode);
         static bool compare_hopcount(const CacheEntry* first, const CacheEntry* second);
+        static bool compare_pathcost (const CacheEntry *first, const CacheEntry *second);
 
 
         // stats related variables
