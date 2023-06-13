@@ -29,8 +29,15 @@ void KMaxPropRoutingLayer::initialize(int stage)
         usedRNG = par("usedRNG");
         cacheSizeReportingFrequency = par("cacheSizeReportingFrequency");
         numEventsHandled = 0;
-        TimePerPacket = par("TimePerPacket");
+        //TimePerPacket = par("TimePerPacket");
         ackTtl = par("ackTtl");
+
+        int dataSizeInBytes = getParentModule()->getSubmodule("app")->par("dataSizeInBytes");
+        int wirelessHeaderSize = getParentModule()->getSubmodule("link")->par("wirelessHeaderSize");
+        double bandwidthBitRate = getParentModule()->getSubmodule("link")->par("bandwidthBitRate");
+        TimePerPacket = (dataSizeInBytes+wirelessHeaderSize)/bandwidthBitRate*8;
+
+
 
         syncedNeighbourListIHasChanged = TRUE;
 
@@ -395,7 +402,6 @@ int KMaxPropRoutingLayer::macAddressToNodeIndex(string macAddress){
  */
 void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 {
-
     // todo LEN TEST
     // generate a dummy routing info
     string macAdresses[] = {"AAA", "BBB", "CCC"};
@@ -571,6 +577,13 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 {
     KDataMsg *omnetDataMsg = dynamic_cast<KDataMsg*>(msg);
     bool found;
+
+    // Proceed with sync Process
+    string nodeBMacAddress = omnetDataMsg->getSourceAddress();
+    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress.c_str());
+    syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + TimePerPacket;
+    syncedNeighbour->neighbourSyncing = TRUE;
+    EV << ownMACAddress << ": Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
 
     // increment the travelled hop count
     omnetDataMsg->setHopsTravelled(omnetDataMsg->getHopsTravelled() + 1);
