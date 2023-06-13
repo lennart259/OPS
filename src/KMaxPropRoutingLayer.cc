@@ -1038,22 +1038,35 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
     EV << ownMACAddress << ": routing info was sent to: " << destinationAddress << "\n";
 }
 
-double KMaxPropRoutingLayer::computeDeliveryLikelihood(int destinationNodeIndex){
-    return 0.0;
+
+/***********************computePathCostsToFinalDest()***************************
+ * computes the path cost to the final destination for all messages in cache,
+ * upon meeting a neighbor
+ * The delivery likelihood is stored as pathCost in the cacheEntries.
+ */
+void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
+
 }
 
 
+// TODO: < or > ??
 // comparison, based on hopsTravelled
 bool KMaxPropRoutingLayer::compare_hopcount (const CacheEntry *first, const CacheEntry *second)
 {
   return ( first->hopsTravelled < second->hopsTravelled );
 }
 
+// comparison, based on pathCost
+bool KMaxPropRoutingLayer::compare_pathcost (const CacheEntry *first, const CacheEntry *second)
+{
+  return ( first->pathCost < second->pathCost );
+}
+
 /********************sortBuffer()**************************
  *
  * sort the local buffer (cacheList) by criterion:
  * mode = 0: only hopcount
- * todo: mode = 1: only peerLikelihood
+ * mode = 1: only peerLikelihood
  * todo: mode = 2: maxprop: split the buffer, first half is sorted by hopcount, 2nd half
  * is by peer likelihood, the splitpoint is dynamic.
  * */
@@ -1062,6 +1075,8 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
     case 0: // sort only by hopcount
         cacheList.sort(compare_hopcount);
         break;
+    case 1:
+        cacheList.sort(compare_pathcost);
     default:
         break;
     }
@@ -1139,7 +1154,6 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
     iteratorSyncedNeighbour = syncedNeighbourList.begin();
     while (iteratorSyncedNeighbour != syncedNeighbourList.end()) {
         SyncedNeighbour *syncedNeighbour = *iteratorSyncedNeighbour;
-
         syncedNeighbour->randomBackoffStarted = FALSE;
         syncedNeighbour->randomBackoffEndTime = 0.0;
         syncedNeighbour->neighbourSyncing = FALSE;
@@ -1158,9 +1172,13 @@ void KMaxPropRoutingLayer::setSyncingNeighbourInfoForNoNeighboursOrEmptyCache()
  * */
 void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 {
+    // compute and store pathCosts for all messages in buffer for the current neighbor
+    computePathCostsToFinalDest(macAddressToNodeIndex(destinationAddress));
+
     // sort Buffer
     EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
     sortBuffer(0);   // 0: sort by hopcount
+
 
     // iterate through the whole cacheList
     CacheEntry *cacheEntry;
