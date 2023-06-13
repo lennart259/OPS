@@ -18,6 +18,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
         // get parameters
         totalNumNodes = getParentModule()->getParentModule()->par("numNodes");
         ownMACAddress = par("ownMACAddress").stringValue();
+        ownNodeIndex = par("nodeIndex");
         nextAppID = 1;
         maximumCacheSize = par("maximumCacheSize");
         currentCacheSize = 0;
@@ -37,6 +38,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
         routingInfoList.reserve(totalNumNodes); // reserve max size of vector which could hold routing info of all nodes in the NW
 
         RoutingInfo ownRoutingInfo;
+        ownRoutingInfo.nodeIndex = ownNodeIndex;
         ownRoutingInfo.nodeMACAddress = ownMACAddress;
         ownRoutingInfo.peerLikelihoods.reserve(totalNumNodes);
 
@@ -421,7 +423,8 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
         send(routingInfoMsg, "lowerLayerOut");
 
          */
-        EV << ownMACAddress << " is looking at Neighbour : " << nodeMACAddress.c_str() << "\n";
+        EV << ownMACAddress << " / nodeIndex " << ownNodeIndex << " is looking at Neighbour : " << nodeMACAddress.c_str() << "\n";
+
         // get syncing info of neighbor
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
 
@@ -887,11 +890,13 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
 
     // 0. Extract data from the message
     string nodeBMacAddress = routingInfoMsg->getSourceAddress();
+    int nodeBIndex = routingInfoMsg->getSourceNodeIndex();
     EV << ownMACAddress << ": RoutingInfo was received from: " << nodeBMacAddress << "\n";
 
     // create new RoutingInfo object which we get out of the message
     RoutingInfo nodeBRoutingInfo;
     nodeBRoutingInfo.nodeMACAddress = nodeBMacAddress;
+    nodeBRoutingInfo.nodeIndex = nodeBIndex;
     for(int i = 0; i < routingInfoMsg->getPeerLikelihoodsArraySize(); i++) {
         nodeBRoutingInfo.peerLikelihoods.push_back(routingInfoMsg->getPeerLikelihoods(i));
     }
@@ -900,7 +905,7 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     bool found = false;
     vector<RoutingInfo>::size_type index = 0;
     while(index != routingInfoList.size()) {
-        if(routingInfoList[index].nodeMACAddress == nodeBMacAddress) {
+        if(routingInfoList[index].nodeIndex == nodeBIndex) {
             found = true;
             break;
         }
@@ -923,7 +928,7 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     vector<PeerLikelihood>::size_type indexPl = 0;
     vector<PeerLikelihood>::size_type totalSizePl = routingInfoList[0].peerLikelihoods.size();
     while(indexPl != totalSizePl) {
-        if(routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress == nodeBMacAddress) {
+        if(routingInfoList[0].peerLikelihoods[indexPl].nodeIndex == nodeBIndex) {
             found = true;
             break;
         }
@@ -936,6 +941,7 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     else { // add new peerLikelihood
         PeerLikelihood newPL;
         newPL.nodeMACAddress = nodeBMacAddress;
+        newPL.nodeIndex = nodeBIndex;
         newPL.likelihood = 1.0;
         routingInfoList[0].peerLikelihoods.push_back(newPL);
         EV << ownMACAddress << ": we added new peer to own peerLikelihood list \n";
@@ -986,16 +992,18 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
 
     vector<PeerLikelihood>::size_type totalSizePl = routingInfoList[0].peerLikelihoods.size();
     vector<PeerLikelihood>::size_type indexPl;
+    routingInfoMsg->setSourceNodeIndex(ownNodeIndex);
     routingInfoMsg->setSourceAddress(ownMACAddress.c_str());
     routingInfoMsg->setDestinationAddress(destinationAddress.c_str());
     routingInfoMsg->setPeerLikelihoodsArraySize(totalSizePl);
 
     for(indexPl = 0; indexPl != totalSizePl; indexPl++) {
         PeerLikelihood pL;
+        pL.nodeIndex = routingInfoList[0].peerLikelihoods[indexPl].nodeIndex;
         pL.nodeMACAddress = routingInfoList[0].peerLikelihoods[indexPl].nodeMACAddress;
         pL.likelihood = routingInfoList[0].peerLikelihoods[indexPl].likelihood;
         routingInfoMsg->setPeerLikelihoods(indexPl, pL);
-        EV << "MAC: " << pL.nodeMACAddress << "\n";
+        EV << "MAC: " << pL.nodeMACAddress << " NodeIndex: " << pL.nodeIndex << "\n";
         EV << "PL : " << pL.likelihood << "\n";
     }
     send(routingInfoMsg, "lowerLayerOut");

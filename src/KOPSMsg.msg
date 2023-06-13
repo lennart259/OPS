@@ -147,6 +147,7 @@ packet KAckMsg {
 // MaxProp   ->   6 + 6        4             16 
 
 struct PeerLikelihood {
+    int nodeIndex;
     string nodeMACAddress;
     double likelihood;
 };
@@ -155,7 +156,8 @@ packet KRoutingInfoMsg {
     // common fields
     string sourceAddress;
     string destinationAddress;
-
+    int sourceNodeIndex;
+	
     // MaxProp specific fields
     PeerLikelihood peerLikelihoods[];
 }

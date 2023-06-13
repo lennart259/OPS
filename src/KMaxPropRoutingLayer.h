@@ -37,6 +37,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
     private:
         int totalNumNodes;
         string ownMACAddress;
+        int ownNodeIndex;
         int nextAppID;
         int maximumCacheSize;
         double antiEntropyInterval;
@@ -117,6 +118,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         */
 
         struct RoutingInfo {
+            int nodeIndex;
             string nodeMACAddress;       // the node's own node ID
             vector<PeerLikelihood> peerLikelihoods; // other node ID's and path likelihoods
         };
