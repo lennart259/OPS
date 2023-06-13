@@ -168,6 +168,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void createAndSendDataMessage(CacheEntry *cacheEntry, string destinationAddress);
         int macAddressToNodeIndex(string macAddress);
         void computePathCostsToFinalDest(int neighbourNodeIndex);
+        double computePathCost(int startNodeIndex, int destinationNodeIndex);
         void sortBuffer(int mode);
         static bool compare_hopcount(const CacheEntry* first, const CacheEntry* second);
         static bool compare_pathcost (const CacheEntry *first, const CacheEntry *second);
