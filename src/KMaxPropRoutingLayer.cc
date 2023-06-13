@@ -323,6 +323,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
         cacheEntry->destinationOriented = omnetDataMsg->getDestinationOriented();
         if (omnetDataMsg->getDestinationOriented()) {
             cacheEntry->finalDestinationAddress = omnetDataMsg->getFinalDestinationAddress();
+            cacheEntry->finalDestinationNodeIndex = macAddressToNodeIndex(omnetDataMsg->getFinalDestinationAddress());
         }
         cacheEntry->goodnessValue = omnetDataMsg->getGoodnessValue();
         cacheEntry->hopsTravelled = 0;
@@ -353,6 +354,33 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
     emit(currentCacheSizeBytesSignal2, currentCacheSize);
 
     delete msg;
+}
+
+/*******************macAddressToNodeIndex()***************************
+ * helper function to get a nodeIndex from MAC Address 02:00:00:00:00:01:02:03 -> 123
+ */
+int KMaxPropRoutingLayer::macAddressToNodeIndex(string macAddress){
+
+    static int pow10[10] = {
+        1, 10, 100, 1000, 10000,
+        100000, 1000000, 10000000, 100000000, 1000000000
+    };
+    int outNodeIndex = 0;
+    const char* delim = ":"; // use ':' as separator for the mac Address
+    char* macStr = const_cast<char*>(macAddress.c_str());
+    char *ptr;
+    ptr = strtok(macStr, delim);
+    int i = 5;
+
+    while (ptr != NULL)
+    {
+        if(i < 5 && i >= 0) { // skip 1st part of MAC address
+            outNodeIndex += stoi(ptr) * pow10[i];
+        }
+        ptr = strtok(NULL, delim);
+        --i;
+    }
+    return outNodeIndex;
 }
 
 
@@ -424,7 +452,6 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 
          */
         EV << ownMACAddress << " / nodeIndex " << ownNodeIndex << " is looking at Neighbour : " << nodeMACAddress.c_str() << "\n";
-
         // get syncing info of neighbor
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
 
@@ -624,6 +651,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
             cacheEntry->destinationOriented = omnetDataMsg->getDestinationOriented();
             if (omnetDataMsg->getDestinationOriented()) {
                 cacheEntry->finalDestinationAddress = omnetDataMsg->getFinalDestinationAddress();
+                cacheEntry->finalDestinationNodeIndex = (int)omnetDataMsg->getFinalDestinationNodeIndex();
             }
             cacheEntry->goodnessValue = omnetDataMsg->getGoodnessValue();
 
@@ -1010,6 +1038,11 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
     EV << ownMACAddress << ": routing info was sent to: " << destinationAddress << "\n";
 }
 
+double KMaxPropRoutingLayer::computeDeliveryLikelihood(int destinationNodeIndex){
+    return 0.0;
+}
+
+
 // comparison, based on hopsTravelled
 bool KMaxPropRoutingLayer::compare_hopcount (const CacheEntry *first, const CacheEntry *second)
 {
@@ -1218,6 +1251,8 @@ void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, stri
     dataMsg->setDestinationOriented(cacheEntry->destinationOriented);
     if (cacheEntry->destinationOriented) {
         dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
+        dataMsg->setFinalDestinationNodeIndex(cacheEntry->finalDestinationNodeIndex);
+        EV << ownMACAddress << ": sending Message with destination MAC: " << dataMsg->getFinalDestinationAddress() << " and node Index " << dataMsg->getFinalDestinationNodeIndex() << "\n";
     }
     dataMsg->setMessageID(cacheEntry->messageID.c_str());
     dataMsg->setHopCount(cacheEntry->hopCount);
@@ -1444,6 +1479,7 @@ void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
             dataMsg->setDestinationOriented(cacheEntry->destinationOriented);
             if (cacheEntry->destinationOriented) {
                 dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
+                dataMsg->setFinalDestinationNodeIndex(cacheEntry->finalDestinationNodeIndex);
             }
             dataMsg->setMessageID(cacheEntry->messageID.c_str());
             dataMsg->setHopCount(cacheEntry->hopCount);

@@ -35,6 +35,7 @@ packet KDataMsg {
 //    string finalDestinationNodeName;
     string initialOriginatorAddress;
     string finalDestinationAddress;
+    int finalDestinationNodeIndex;
     bool destinationOriented = false;
 
     // keetchi specific fields
