@@ -12,6 +12,7 @@
 
 #define TRUE                            1
 #define FALSE                           0
+#define NUM_NODES 20
 
 #include <omnetpp.h>
 #include <cstdlib>
@@ -134,12 +135,13 @@ class KMaxPropRoutingLayer : public cSimpleModule
         */
 
         // local list holding all lists of peerLikelihoods for a respective node
-        vector<RoutingInfo> routingInfoList; // idk if this works
+        vector<RoutingInfo> routingInfoList;
 
         list<AppInfo*> registeredAppList;
         list<CacheEntry*> cacheList;
         list<SyncedNeighbour*> syncedNeighbourList;
         list<Ack*> ackCacheList;
+        double nodeGraph[NUM_NODES][NUM_NODES];
         bool syncedNeighbourListIHasChanged;
 
         void ageDataInCache();

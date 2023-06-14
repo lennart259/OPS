@@ -1062,6 +1062,47 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
 // and compute the lowest path cost, if there are several possible paths starting with
 // the current neighbour neighbourNodeIndex.
 
+    // initialize the graph with -1 which means "no connection"
+    int u, v = 0;
+    for(u = 0; u < NUM_NODES; u++) {
+        for(v = 0; v < NUM_NODES; v++) {
+            nodeGraph[u][v] = -1.0;
+        }
+    }
+
+    // go through the whole routing info list and generate the graph.
+
+    EV << ownMACAddress << ": display complete RoutingInfoList\n";
+    RoutingInfo routingInfoEntry;
+    vector<RoutingInfo>::iterator routingInfoIterator;
+    vector<PeerLikelihood>::iterator pLIterator;
+    routingInfoIterator = routingInfoList.begin();
+    u = 0;
+    v = 0;
+    while(routingInfoIterator != routingInfoList.end()) {
+        routingInfoEntry = *routingInfoIterator;
+        pLIterator = routingInfoEntry.peerLikelihoods.begin();
+        EV << "Node: " << routingInfoEntry.nodeIndex << ", pathLikelihoods:\n";
+        while(pLIterator != routingInfoEntry.peerLikelihoods.end()) {
+            EV << "    Node: " << pLIterator->nodeIndex << " cost: " << (1-pLIterator->likelihood) << "\n";
+            // add the entry from routingInfoList as a graph edge
+            nodeGraph[routingInfoEntry.nodeIndex][pLIterator->nodeIndex] = (1-pLIterator->likelihood);
+            pLIterator++;
+        }
+        routingInfoIterator++;
+    }
+
+    // print the graph for debug
+    char buff[100];
+    for(u = 0; u < NUM_NODES; u++) {
+        for(v = 0; v < NUM_NODES; v++) {
+            snprintf(buff, sizeof(buff), "%+1.2f", nodeGraph[u][v]);
+            std::string myString = buff;
+            EV << myString << "  ";
+        }
+        EV << "\n";
+    }
+
     CacheEntry *cacheEntry;
     list<CacheEntry*>::iterator iteratorCache;
     bool found = FALSE;
@@ -1089,6 +1130,7 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
  *
  */
 double KMaxPropRoutingLayer::computePathCost(int startNodeIndex, int destinationNodeIndex){
+
     return std::numeric_limits<double>::max();
 }
 
