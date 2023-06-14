@@ -1103,6 +1103,14 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
         EV << "\n";
     }
 
+    // compute all the pathCosts from the neighbourNodeIndex as starting point
+    slowDijkstra(nodeGraph, neighbourNodeIndex);
+
+    EV << "All pathCosts starting from Node " << neighbourNodeIndex << ":\n";
+    for (v = 0; v < NUM_NODES; v++) {
+        EV << "    Cost to node " << v << ": " << pathCosts[v] << "\n";
+    }
+
     CacheEntry *cacheEntry;
     list<CacheEntry*>::iterator iteratorCache;
     bool found = FALSE;
@@ -1115,23 +1123,73 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
     int n = 0;
     while (iteratorCache != cacheList.end()) {
         cacheEntry = *iteratorCache;
-
-        cacheEntry->pathCost = computePathCost(neighbourNodeIndex, cacheEntry->finalDestinationNodeIndex);
-
+        cacheEntry->pathCost = pathCosts[cacheEntry->finalDestinationNodeIndex];
         iteratorCache++;
     }
 
 }
 
-/************************+computePathCost()****************************
- * uses the routing info list to compute the lowest path cost from startNodeIndex to destinationNodeIndex.
- * If the current routing info does not contain a possible path (destinationNodeIndex has never been seen),
- * the function will return the highest possible double value.
- *
- */
-double KMaxPropRoutingLayer::computePathCost(int startNodeIndex, int destinationNodeIndex){
 
-    return std::numeric_limits<double>::max();
+// SLOW DIJKSTRA CODE FROM https://www.geeksforgeeks.org/dijkstras-shortest-path-algorithm-greedy-algo-7/
+
+// A utility function to find the vertex with minimum
+// distance value, from the set of vertices not yet included
+// in shortest path tree
+int KMaxPropRoutingLayer::minDistance(double dist[], bool sptSet[])
+{
+    // Initialize min value
+    int min_index;
+    double min = std::numeric_limits<double>::max();
+    for (int v = 0; v < NUM_NODES; v++)
+        if (sptSet[v] == false && dist[v] <= min)
+            min = dist[v], min_index = v;
+
+    return min_index;
+}
+
+// Function that implements Dijkstra's single source
+// shortest path algorithm for a graph represented using
+// adjacency matrix representation
+void KMaxPropRoutingLayer::slowDijkstra(double graph[NUM_NODES][NUM_NODES], int src)
+{
+    //double dist[NUM_NODES]; // The output array.  dist[i] will hold the
+    // shortest distance from src to i
+
+    bool sptSet[NUM_NODES]; // sptSet[i] will be true if vertex i is
+    // included in shortest path tree or shortest distance from src to i is finalized
+
+    // Initialize all distances as INFINITE and stpSet[] as false
+    for (int i = 0; i < NUM_NODES; i++)
+        pathCosts[i] = std::numeric_limits<double>::max(), sptSet[i] = false;
+
+    // Distance of source vertex from itself is always 0
+    pathCosts[src] = 0;
+
+    // Find shortest path for all vertices
+    for (int count = 0; count < NUM_NODES - 1; count++) {
+        // Pick the minimum distance vertex from the set of
+        // vertices not yet processed. u is always equal to
+        // src in the first iteration.
+        int u = minDistance(pathCosts, sptSet);
+
+        // Mark the picked vertex as processed
+        sptSet[u] = true;
+
+        // Update dist value of the adjacent vertices of the
+        // picked vertex.
+        for (int v = 0; v < NUM_NODES; v++)
+            // Update dist[v] only if is not in sptSet,
+            // there is an edge from u to v (the entry in the matrix is not -1), and total
+            // weight of path from src to  v through u is
+            // smaller than current value of dist[v]
+
+            // && && pathCosts[u] != std::numeric_limits<double>::max()?!
+            if (!sptSet[v] && (graph[u][v] + 1 > 1e-6)
+                    && pathCosts[u] + graph[u][v] < pathCosts[v]) {
+                pathCosts[v] = pathCosts[u] + graph[u][v];
+            }
+
+    }
 }
 
 // comparison, based on hopsTravelled
@@ -1261,7 +1319,7 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 
     // sort Buffer
     EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
-    sortBuffer(0);   // 0: sort by hopcount
+    sortBuffer(1);   // 0: sort by hopcount
 
 
     // iterate through the whole cacheList

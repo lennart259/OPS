@@ -142,6 +142,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         list<SyncedNeighbour*> syncedNeighbourList;
         list<Ack*> ackCacheList;
         double nodeGraph[NUM_NODES][NUM_NODES];
+        double pathCosts[NUM_NODES];
         bool syncedNeighbourListIHasChanged;
 
         void ageDataInCache();
@@ -170,7 +171,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void createAndSendDataMessage(CacheEntry *cacheEntry, string destinationAddress);
         int macAddressToNodeIndex(string macAddress);
         void computePathCostsToFinalDest(int neighbourNodeIndex);
-        double computePathCost(int startNodeIndex, int destinationNodeIndex);
+        int minDistance(double dist[], bool sptSet[]);
+        void slowDijkstra(double graph[NUM_NODES][NUM_NODES], int src);
         void sortBuffer(int mode);
         static bool compare_hopcount(const CacheEntry* first, const CacheEntry* second);
         static bool compare_pathcost (const CacheEntry *first, const CacheEntry *second);
