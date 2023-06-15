@@ -1213,12 +1213,28 @@ bool KMaxPropRoutingLayer::compare_pathcost (const CacheEntry *first, const Cach
  * is by peer likelihood, the splitpoint is dynamic.
  * */
 void KMaxPropRoutingLayer::sortBuffer(int mode){
+
+    // TODO HOW DO WE COMPUTE THE THRESH?
+    int thresh = cacheList.size()/2;
+
     switch(mode) {
     case 0: // sort only by hopcount
         cacheList.sort(compare_hopcount);
         break;
     case 1:
         cacheList.sort(compare_pathcost);
+        break;
+    case 2:
+
+        cacheList.sort(compare_hopcount); // sort all by hop count
+        cacheListSortPath.splice(cacheListSortPath.end(), // move part to aux list to sort by pathCost
+                cacheList, std::advance(cacheList.begin(), thresh), cacheList.end());
+        cacheListSortPath.sort(compare_pathcost); // sort by path cost
+        cacheList.splice(cacheList.end(), cacheListSortPath); // add the sorted aux list back to the cache.
+
+        //cacheListSortHop.insert(cacheListSortHop.end(), cacheList.begin(), cacheList.begin()+thresh);
+        //cacheListSortPath.insert(cacheListSortPath.end(), cacheList.begin()+thresh+1, cacheList.end());
+        break;
     default:
         break;
     }

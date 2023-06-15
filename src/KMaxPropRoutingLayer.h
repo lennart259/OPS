@@ -139,6 +139,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
 
         list<AppInfo*> registeredAppList;
         list<CacheEntry*> cacheList;
+        list<CacheEntry*> cacheListSortPath;
         list<SyncedNeighbour*> syncedNeighbourList;
         list<Ack*> ackCacheList;
         double nodeGraph[NUM_NODES][NUM_NODES];
