@@ -1227,15 +1227,16 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
     case 2:
 
         cacheList.sort(compare_hopcount); // sort all by hop count
-        cacheListSortPath.splice(cacheListSortPath.end(), // move part to aux list to sort by pathCost
-                cacheList, std::advance(cacheList.begin(), thresh), cacheList.end());
+        // init iteration and jump to thresh
+        auto it = cacheList.begin();
+        std::advance(it, thresh);
+        // move part to aux list to sort by pathCost
+        cacheListSortPath.splice(cacheListSortPath.end(), cacheList, it, cacheList.end());
         cacheListSortPath.sort(compare_pathcost); // sort by path cost
         cacheList.splice(cacheList.end(), cacheListSortPath); // add the sorted aux list back to the cache.
 
         //cacheListSortHop.insert(cacheListSortHop.end(), cacheList.begin(), cacheList.begin()+thresh);
         //cacheListSortPath.insert(cacheListSortPath.end(), cacheList.begin()+thresh+1, cacheList.end());
-        break;
-    default:
         break;
     }
 }
