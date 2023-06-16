@@ -151,8 +151,6 @@ class KMaxPropRoutingLayer : public cSimpleModule
         void handleDataMsgFromUpperLayer(cMessage *msg);
         void handleNeighbourListMsgFromLowerLayer(cMessage *msg);
         void handleDataMsgFromLowerLayer(cMessage *msg);
-        void handleSummaryVectorMsgFromLowerLayer(cMessage *msg);
-        void handleDataRequestMsgFromLowerLayer(cMessage *msg);
 
 
         SyncedNeighbour* getSyncingNeighbourInfo(string nodeMACAddress);
@@ -188,6 +186,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         simsignal_t hopsTravelledSignal;
         simsignal_t hopsTravelledCountSignal;
 
+        simsignal_t cacheBytesRemovedByAckSignal;
         simsignal_t cacheBytesRemovedSignal;
         simsignal_t cacheBytesAddedSignal;
         simsignal_t cacheBytesUpdatedSignal;

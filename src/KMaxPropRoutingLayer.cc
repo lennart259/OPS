@@ -70,6 +70,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
         hopsTravelledSignal = registerSignal("fwdHopsTravelled");
         hopsTravelledCountSignal = registerSignal("fwdHopsTravelledCount");
 
+        cacheBytesRemovedByAckSignal = registerSignal("fwdCacheBytesRemovedByAck");
         cacheBytesRemovedSignal = registerSignal("fwdCacheBytesRemoved");
         cacheBytesAddedSignal = registerSignal("fwdCacheBytesAdded");
         cacheBytesUpdatedSignal = registerSignal("fwdCacheBytesUpdated");
@@ -155,16 +156,6 @@ void KMaxPropRoutingLayer::handleMessage(cMessage *msg)
         } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KDataMsg*>(msg) != NULL) {
 
             handleDataMsgFromLowerLayer(msg);
-
-        // summary vector message arrived from the lower layer (link layer)
-        } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KSummaryVectorMsg*>(msg) != NULL) {
-
-            handleSummaryVectorMsgFromLowerLayer(msg);
-
-        // data request message arrived from the lower layer (link layer)
-        } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KDataRequestMsg*>(msg) != NULL) {
-
-            handleDataRequestMsgFromLowerLayer(msg);
 
         } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KRoutingInfoMsg*>(msg) != NULL) {
 
@@ -529,9 +520,6 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 syncedNeighbour->sendDataNext = FALSE;
 
                 // // send summary vector (to start syncing)
-                // KSummaryVectorMsg *summaryVectorMsg = makeSummaryVectorMessage();
-                // summaryVectorMsg->setDestinationAddress(nodeMACAddress.c_str());
-                // send(summaryVectorMsg, "lowerLayerOut");
 
                 // todo phase detection
                 // phase 1:
@@ -545,8 +533,6 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 EV << ownMACAddress << ": Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
                 syncedNeighbour->neighbourSyncing = TRUE;
 
-                // emit(sumVecBytesSentSignal, (long) summaryVectorMsg->getByteLength());
-                // emit(totalBytesSentSignal, (long) summaryVectorMsg->getByteLength());
             }
         }
 
@@ -829,6 +815,7 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
                 EV << ownMACAddress << ": Found ACK'd message in own Cache... \n";
                 currentCacheSize -= cacheEntry->realPacketSize;
 
+                emit(cacheBytesRemovedByAckSignal, cacheEntry->realPayloadSize);
                 emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
                 emit(currentCacheSizeBytesSignal, currentCacheSize);
                 emit(currentCacheSizeReportedCountSignal, (int) 1);
@@ -1019,7 +1006,6 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
     delete msg;
 }
 
-
 /**********************sendRoutingInfoMessage()*************************
  *
  * take own routing info which is stored at routingInfoList[0]
@@ -1027,7 +1013,6 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
  *
  * */
 void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
-
 
     KRoutingInfoMsg *routingInfoMsg = new KRoutingInfoMsg();
 
@@ -1053,15 +1038,14 @@ void KMaxPropRoutingLayer::sendRoutingInfoMessage(string destinationAddress){
 
 
 /***********************computePathCostsToFinalDest()***************************
+ * Builds a graph for all nodes in the simulation.
  * computes the path cost to the final destination for all messages in cache,
  * upon meeting a neighbor
  * The delivery likelihood is stored as pathCost in the cacheEntries.
  */
 void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
-// iterate through cache. For each message look at their final destination,
-// and compute the lowest path cost, if there are several possible paths starting with
-// the current neighbour neighbourNodeIndex.
 
+    // STEP 1: build the graph
     // initialize the graph with -1 which means "no connection"
     int u, v = 0;
     for(u = 0; u < totalNumNodes; u++) {
@@ -1069,9 +1053,7 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
             nodeGraph[u][v] = -1.0;
         }
     }
-
     // go through the whole routing info list and generate the graph.
-
     EV << ownMACAddress << ": display complete RoutingInfoList\n";
     RoutingInfo routingInfoEntry;
     vector<RoutingInfo>::iterator routingInfoIterator;
@@ -1092,6 +1074,7 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
         routingInfoIterator++;
     }
 
+    /*
     // print the graph for debug
     char buff[100];
     for(u = 0; u < totalNumNodes; u++) {
@@ -1102,15 +1085,20 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
         }
         EV << "\n";
     }
+    */
 
+    // STEP 2: Dijkstra:
     // compute all the pathCosts from the neighbourNodeIndex as starting point
     slowDijkstra(nodeGraph, neighbourNodeIndex);
 
+    /*
     EV << "All pathCosts starting from Node " << neighbourNodeIndex << ":\n";
     for (v = 0; v < totalNumNodes; v++) {
         EV << "    Cost to node " << v << ": " << pathCosts[v] << "\n";
     }
+    */
 
+    // STEP 3: save path costs in the cache entries
     CacheEntry *cacheEntry;
     list<CacheEntry*>::iterator iteratorCache;
     bool found = FALSE;
@@ -1131,10 +1119,11 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
 
 
 // SLOW DIJKSTRA CODE FROM https://www.geeksforgeeks.org/dijkstras-shortest-path-algorithm-greedy-algo-7/
-
-// A utility function to find the vertex with minimum
-// distance value, from the set of vertices not yet included
-// in shortest path tree
+/********************minDistance()****************************
+ * A utility function to find the vertex with minimum
+ * distance value, from the set of vertices not yet included
+ * in shortest path tree
+ */
 int KMaxPropRoutingLayer::minDistance(double dist[], bool sptSet[])
 {
     // Initialize min value
@@ -1147,9 +1136,13 @@ int KMaxPropRoutingLayer::minDistance(double dist[], bool sptSet[])
     return min_index;
 }
 
-// Function that implements Dijkstra's single source
-// shortest path algorithm for a graph represented using
-// adjacency matrix representation
+
+/*************************slowDijkstra()*************************
+ * Function that implements Dijkstra's single source
+ * shortest path algorithm for a graph represented using
+ * adjacency matrix representation (directed graph)
+ * The time complexity of this (slow) algorithm is O(N^2)
+ */
 void KMaxPropRoutingLayer::slowDijkstra(double graph[NUM_NODES][NUM_NODES], int src)
 {
     //double dist[totalNumNodes]; // The output array.  dist[i] will hold the
@@ -1209,7 +1202,7 @@ bool KMaxPropRoutingLayer::compare_pathcost (const CacheEntry *first, const Cach
  * sort the local buffer (cacheList) by criterion:
  * mode = 0: only hopcount
  * mode = 1: only peerLikelihood
- * todo: mode = 2: maxprop: split the buffer, first half is sorted by hopcount, 2nd half
+ * mode = 2: maxprop: split the buffer, first half is sorted by hopcount, 2nd half
  * is by peer likelihood, the splitpoint is dynamic.
  * */
 void KMaxPropRoutingLayer::sortBuffer(int mode){
@@ -1233,13 +1226,9 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
         cacheListSortPath.splice(cacheListSortPath.end(), cacheList, it, cacheList.end());
         cacheListSortPath.sort(compare_pathcost); // sort by path cost
         cacheList.splice(cacheList.end(), cacheListSortPath); // add the sorted aux list back to the cache.
-
-        //cacheListSortHop.insert(cacheListSortHop.end(), cacheList.begin(), cacheList.begin()+thresh);
-        //cacheListSortPath.insert(cacheListSortPath.end(), cacheList.begin()+thresh+1, cacheList.end());
         break;
     }
 }
-
 
 KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbourInfo(string nodeMACAddress)
 {
@@ -1377,7 +1366,10 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
     }
 }
 
-
+/*******************sendDataDestinedToNeighbor()***********************
+ * Searches the cache for data that is directly destined to Neighbour
+ * If entries are found, they are sent directly to the neighbour.
+ */
 int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
 {
     // sends all messages destined to the neighbor
@@ -1398,9 +1390,17 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
             EV << ownMACAddress << " starts sending Data Destined To Neighbor " << destinationAddress << "\n";
             createAndSendDataMessage(cacheEntry, destinationAddress);
             sentMessages++;
+
+            currentCacheSize -= cacheEntry->realPacketSize;
+
+            emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
+            emit(currentCacheSizeBytesSignal, currentCacheSize);
+            emit(currentCacheSizeReportedCountSignal, (int) 1);
+
+            emit(currentCacheSizeBytesSignal2, currentCacheSize);
+
             // remove the cache entry from cache.
             cacheList.erase(iteratorCache++);
-            delete cacheEntry; // todo?! why delete here
         }
         else
             iteratorCache ++;
@@ -1411,6 +1411,9 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
     return sentMessages;
 }
 
+/*********************createAndSendDataMessage()***********************
+ * Creates an omnet dataMsg from a cache entry and sends it to lower layer/ destination address
+ */
 void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, string destinationAddress) {
     KDataMsg *dataMsg = new KDataMsg();
 
@@ -1420,7 +1423,7 @@ void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, stri
     dataMsg->setDummyPayloadContent(cacheEntry->dummyPayloadContent.c_str());
     dataMsg->setValidUntilTime(cacheEntry->validUntilTime);
     dataMsg->setRealPayloadSize(cacheEntry->realPayloadSize);
-    // check KOPSMsg.msg on sizing mssages
+    // check KOPSMsg.msg on sizing messages
     int realPacketSize = 6 + 6 + 2 + cacheEntry->realPayloadSize + 4 + 6 + 1;
     dataMsg->setRealPacketSize(realPacketSize);
     dataMsg->setByteLength(realPacketSize);
@@ -1453,45 +1456,8 @@ void KMaxPropRoutingLayer::createAndSendDataMessage(CacheEntry *cacheEntry, stri
 
     send(dataMsg, "lowerLayerOut");
 
-    emit(dataBytesSentSignal, (long) dataMsg->getByteLength());
+    emit(dataBytesSentSignal, (long) dataMsg->getRealPayloadSize());
     emit(totalBytesSentSignal, (long) dataMsg->getByteLength());
-}
-
-KSummaryVectorMsg* KMaxPropRoutingLayer::makeSummaryVectorMessage()
-{
-    // identify the entries of the summary vector
-    vector<string> selectedMessageIDList;
-    CacheEntry *cacheEntry;
-    list<CacheEntry*>::iterator iteratorCache;
-    iteratorCache = cacheList.begin();
-    while (iteratorCache != cacheList.end()) {
-        cacheEntry = *iteratorCache;
-        if ((cacheEntry->hopCount + 1) < maximumHopCount) {
-            selectedMessageIDList.push_back(cacheEntry->messageID);
-        }
-        iteratorCache++;
-    }
-
-    // make a summary vector message
-    KSummaryVectorMsg *summaryVectorMsg = new KSummaryVectorMsg();
-    summaryVectorMsg->setSourceAddress(ownMACAddress.c_str());
-    summaryVectorMsg->setMessageIDHashVectorArraySize(selectedMessageIDList.size());
-    vector<string>::iterator iteratorMessageIDList;
-    int i = 0;
-    iteratorMessageIDList = selectedMessageIDList.begin();
-    while (iteratorMessageIDList != selectedMessageIDList.end()) {
-        string messageID = *iteratorMessageIDList;
-
-        summaryVectorMsg->setMessageIDHashVector(i, messageID.c_str());
-
-        i++;
-        iteratorMessageIDList++;
-    }
-    int realPacketSize = 6 + 6 + (selectedMessageIDList.size() * KMAXPROPROUTINGLAYER_MSG_ID_HASH_SIZE);
-    summaryVectorMsg->setRealPacketSize(realPacketSize);
-    summaryVectorMsg->setByteLength(realPacketSize);
-
-    return summaryVectorMsg;
 }
 
 void KMaxPropRoutingLayer::finish()
@@ -1529,168 +1495,3 @@ void KMaxPropRoutingLayer::finish()
     delete cacheSizeReportingTimeoutEvent;
 
 }
-
-void KMaxPropRoutingLayer::handleSummaryVectorMsgFromLowerLayer(cMessage *msg)
-{
-    KSummaryVectorMsg *summaryVectorMsg = dynamic_cast<KSummaryVectorMsg*>(msg);
-
-    emit(sumVecBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
-    emit(totalBytesReceivedSignal, (long) summaryVectorMsg->getByteLength());
-
-    // when a summary vector is received, it means that the neighbour started the syncing
-    // so send the data request message with the required data items
-
-
-    // check and build a list of missing data items
-    string messageID;
-    vector<string> selectedMessageIDList;
-    int i = 0;
-    while (i < summaryVectorMsg->getMessageIDHashVectorArraySize()) {
-        messageID = summaryVectorMsg->getMessageIDHashVector(i);
-
-        // see if data item exist in cache
-        CacheEntry *cacheEntry;
-        list<CacheEntry*>::iterator iteratorCache;
-        bool found = FALSE;
-        iteratorCache = cacheList.begin();
-        while (iteratorCache != cacheList.end()) {
-            cacheEntry = *iteratorCache;
-            if (cacheEntry->messageID == messageID) {
-                found = TRUE;
-                break;
-            }
-
-            iteratorCache++;
-        }
-
-        if (!found) {
-            selectedMessageIDList.push_back(messageID);
-        }
-        i++;
-    }
-
-    // build a KDataRequestMsg with missing data items (i.e.,  message IDs)
-    KDataRequestMsg *dataRequestMsg = new KDataRequestMsg();
-    dataRequestMsg->setSourceAddress(ownMACAddress.c_str());
-    dataRequestMsg->setDestinationAddress(summaryVectorMsg->getSourceAddress());
-    int realPacketSize = 6 + 6 + (selectedMessageIDList.size() * KMAXPROPROUTINGLAYER_MSG_ID_HASH_SIZE);
-    dataRequestMsg->setRealPacketSize(realPacketSize);
-    dataRequestMsg->setByteLength(realPacketSize);
-    dataRequestMsg->setMessageIDHashVectorArraySize(selectedMessageIDList.size());
-    i = 0;
-    vector<string>::iterator iteratorMessageIDList;
-    iteratorMessageIDList = selectedMessageIDList.begin();
-    while (iteratorMessageIDList != selectedMessageIDList.end()) {
-        messageID = *iteratorMessageIDList;
-
-        dataRequestMsg->setMessageIDHashVector(i, messageID.c_str());
-
-        i++;
-        iteratorMessageIDList++;
-    }
-
-    send(dataRequestMsg, "lowerLayerOut");
-
-    emit(dataReqBytesSentSignal, (long) dataRequestMsg->getByteLength());
-    emit(totalBytesSentSignal, (long) dataRequestMsg->getByteLength());
-
-
-    // cancel the random backoff timer (because neighbour started syncing)
-    string nodeMACAddress = summaryVectorMsg->getSourceAddress();
-    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
-    syncedNeighbour->randomBackoffStarted = FALSE;
-    syncedNeighbour->randomBackoffEndTime = 0.0;
-
-    // second - start wait timer until neighbour has finished syncing
-    syncedNeighbour->neighbourSyncing = TRUE;
-    double delayPerDataMessage = 0.5; // assume 500 milli seconds per data message
-    syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + (selectedMessageIDList.size() * delayPerDataMessage);
-
-    // synched neighbour list must be updated in next round
-    // as there were changes
-    syncedNeighbourListIHasChanged = TRUE;
-
-
-    delete msg;
-}
-
-void KMaxPropRoutingLayer::handleDataRequestMsgFromLowerLayer(cMessage *msg)
-{
-    KDataRequestMsg *dataRequestMsg = dynamic_cast<KDataRequestMsg*>(msg);
-
-    emit(dataReqBytesReceivedSignal, (long) dataRequestMsg->getByteLength());
-    emit(totalBytesReceivedSignal, (long) dataRequestMsg->getByteLength());
-
-    int i = 0;
-    while (i < dataRequestMsg->getMessageIDHashVectorArraySize()) {
-        string messageID = dataRequestMsg->getMessageIDHashVector(i);
-
-        CacheEntry *cacheEntry;
-        list<CacheEntry*>::iterator iteratorCache;
-        bool found = FALSE;
-        iteratorCache = cacheList.begin();
-        while (iteratorCache != cacheList.end()) {
-            cacheEntry = *iteratorCache;
-            if (cacheEntry->messageID == messageID) {
-                found = TRUE;
-                break;
-            }
-
-            iteratorCache++;
-        }
-
-        if (found) {
-
-            KDataMsg *dataMsg = new KDataMsg();
-
-            dataMsg->setSourceAddress(ownMACAddress.c_str());
-            dataMsg->setDestinationAddress(dataRequestMsg->getSourceAddress());
-            dataMsg->setDataName(cacheEntry->dataName.c_str());
-            dataMsg->setDummyPayloadContent(cacheEntry->dummyPayloadContent.c_str());
-            dataMsg->setValidUntilTime(cacheEntry->validUntilTime);
-            dataMsg->setRealPayloadSize(cacheEntry->realPayloadSize);
-            // check KOPSMsg.msg on sizing mssages
-            int realPacketSize = 6 + 6 + 2 + cacheEntry->realPayloadSize + 4 + 6 + 1;
-            dataMsg->setRealPacketSize(realPacketSize);
-            dataMsg->setByteLength(realPacketSize);
-            dataMsg->setInitialOriginatorAddress(cacheEntry->initialOriginatorAddress.c_str());
-            dataMsg->setDestinationOriented(cacheEntry->destinationOriented);
-            if (cacheEntry->destinationOriented) {
-                dataMsg->setFinalDestinationAddress(cacheEntry->finalDestinationAddress.c_str());
-                dataMsg->setFinalDestinationNodeIndex(cacheEntry->finalDestinationNodeIndex);
-            }
-            dataMsg->setMessageID(cacheEntry->messageID.c_str());
-            dataMsg->setHopCount(cacheEntry->hopCount);
-            dataMsg->setGoodnessValue(cacheEntry->goodnessValue);
-            dataMsg->setHopsTravelled(cacheEntry->hopsTravelled);
-            dataMsg->setMsgUniqueID(cacheEntry->msgUniqueID);
-            dataMsg->setInitialInjectionTime(cacheEntry->initialInjectionTime);
-
-            send(dataMsg, "lowerLayerOut");
-
-            emit(dataBytesSentSignal, (long) dataMsg->getByteLength());
-            emit(totalBytesSentSignal, (long) dataMsg->getByteLength());
-
-
-            ///Fix 2: remove cache entry after sending to destination
-            if (strstr(cacheEntry->finalDestinationAddress.c_str(), dataRequestMsg->getSourceAddress()) != NULL
-                    && cacheEntry->destinationOriented) {
-
-                currentCacheSize -= cacheEntry->realPacketSize;
-
-                emit(cacheBytesRemovedSignal, cacheEntry->realPayloadSize);
-                emit(currentCacheSizeBytesSignal, currentCacheSize);
-                emit(currentCacheSizeReportedCountSignal, (int) 1);
-
-                emit(currentCacheSizeBytesSignal2, currentCacheSize);
-
-                cacheList.erase(iteratorCache);
-                delete cacheEntry;
-            }
-        }
-
-        i++;
-    }
-    delete msg;
-}
-

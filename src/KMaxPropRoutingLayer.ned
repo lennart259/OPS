@@ -50,6 +50,7 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
         @signal[fwdTotalBytesReceived](type=long);
         @signal[fwdHopsTravelled](type=long);
         @signal[fwdHopsTravelledCount](type=long);
+        @signal[fwdCacheBytesRemovedByAck](type=long);
         @signal[fwdCacheBytesRemoved](type=long);
         @signal[fwdCacheBytesAdded](type=long);
         @signal[fwdCacheBytesUpdated](type=long);
