@@ -1064,8 +1064,8 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
 
     // initialize the graph with -1 which means "no connection"
     int u, v = 0;
-    for(u = 0; u < NUM_NODES; u++) {
-        for(v = 0; v < NUM_NODES; v++) {
+    for(u = 0; u < totalNumNodes; u++) {
+        for(v = 0; v < totalNumNodes; v++) {
             nodeGraph[u][v] = -1.0;
         }
     }
@@ -1094,8 +1094,8 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
 
     // print the graph for debug
     char buff[100];
-    for(u = 0; u < NUM_NODES; u++) {
-        for(v = 0; v < NUM_NODES; v++) {
+    for(u = 0; u < totalNumNodes; u++) {
+        for(v = 0; v < totalNumNodes; v++) {
             snprintf(buff, sizeof(buff), "%+1.2f", nodeGraph[u][v]);
             std::string myString = buff;
             EV << myString << "  ";
@@ -1107,7 +1107,7 @@ void KMaxPropRoutingLayer::computePathCostsToFinalDest(int neighbourNodeIndex){
     slowDijkstra(nodeGraph, neighbourNodeIndex);
 
     EV << "All pathCosts starting from Node " << neighbourNodeIndex << ":\n";
-    for (v = 0; v < NUM_NODES; v++) {
+    for (v = 0; v < totalNumNodes; v++) {
         EV << "    Cost to node " << v << ": " << pathCosts[v] << "\n";
     }
 
@@ -1140,7 +1140,7 @@ int KMaxPropRoutingLayer::minDistance(double dist[], bool sptSet[])
     // Initialize min value
     int min_index;
     double min = std::numeric_limits<double>::max();
-    for (int v = 0; v < NUM_NODES; v++)
+    for (int v = 0; v < totalNumNodes; v++)
         if (sptSet[v] == false && dist[v] <= min)
             min = dist[v], min_index = v;
 
@@ -1152,21 +1152,21 @@ int KMaxPropRoutingLayer::minDistance(double dist[], bool sptSet[])
 // adjacency matrix representation
 void KMaxPropRoutingLayer::slowDijkstra(double graph[NUM_NODES][NUM_NODES], int src)
 {
-    //double dist[NUM_NODES]; // The output array.  dist[i] will hold the
+    //double dist[totalNumNodes]; // The output array.  dist[i] will hold the
     // shortest distance from src to i
 
     bool sptSet[NUM_NODES]; // sptSet[i] will be true if vertex i is
     // included in shortest path tree or shortest distance from src to i is finalized
 
     // Initialize all distances as INFINITE and stpSet[] as false
-    for (int i = 0; i < NUM_NODES; i++)
+    for (int i = 0; i < totalNumNodes; i++)
         pathCosts[i] = std::numeric_limits<double>::max(), sptSet[i] = false;
 
     // Distance of source vertex from itself is always 0
     pathCosts[src] = 0;
 
     // Find shortest path for all vertices
-    for (int count = 0; count < NUM_NODES - 1; count++) {
+    for (int count = 0; count < totalNumNodes - 1; count++) {
         // Pick the minimum distance vertex from the set of
         // vertices not yet processed. u is always equal to
         // src in the first iteration.
@@ -1177,7 +1177,7 @@ void KMaxPropRoutingLayer::slowDijkstra(double graph[NUM_NODES][NUM_NODES], int 
 
         // Update dist value of the adjacent vertices of the
         // picked vertex.
-        for (int v = 0; v < NUM_NODES; v++)
+        for (int v = 0; v < totalNumNodes; v++)
             // Update dist[v] only if is not in sptSet,
             // there is an edge from u to v (the entry in the matrix is not -1), and total
             // weight of path from src to  v through u is

@@ -134,6 +134,14 @@ packet KAckMsg {
     Ack ackList[];
 }
 
+packet KLinkLayerAckMsg {
+	// This Ack message is used to inform the sender in 
+	// forwarding-layer if the message is successfully deliverd.
+	
+    // common fields
+    string sourceAddress;
+    string destinationAddress;
+}
 //
 // Routing Info message (used with MaxProp Routing).
 //
@@ -146,6 +154,7 @@ packet KAckMsg {
 //                addrs |   msg ID	     | total  |
 //                s & d |                | (bytes)|
 // MaxProp   ->   6 + 6        4             16 
+
 
 struct PeerLikelihood {
     int nodeIndex;
