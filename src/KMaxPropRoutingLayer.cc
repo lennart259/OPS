@@ -1225,7 +1225,6 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
         cacheList.sort(compare_pathcost);
         break;
     case 2:
-
         cacheList.sort(compare_hopcount); // sort all by hop count
         // init iteration and jump to thresh
         auto it = cacheList.begin();
@@ -1336,7 +1335,7 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 
     // sort Buffer
     EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
-    sortBuffer(1);   // 0: sort by hopcount
+    sortBuffer(2);   // 0: sort by hopcount
 
 
     // iterate through the whole cacheList
