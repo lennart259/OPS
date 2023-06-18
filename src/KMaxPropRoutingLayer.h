@@ -55,6 +55,9 @@ class KMaxPropRoutingLayer : public cSimpleModule
         int numEventsHandled;
         int currentCacheSize;
 
+        int numPacketsTransmitted;
+        int numTransmissions;
+
         cMessage *cacheSizeReportingTimeoutEvent;
 
         struct AppInfo {
@@ -109,6 +112,9 @@ class KMaxPropRoutingLayer : public cSimpleModule
             bool sendRoutingNext;
             bool sendDataNext;
 
+            bool activeTransmission;
+            int packetsTransmitted;
+
             bool nodeConsidered;
 
         };
@@ -161,6 +167,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         // new MaxProp
         void handleAckMsgFromLowerLayer(cMessage *msg);
         void handleRoutingInfoMsgFromLowerLayer(cMessage *msg);
+        void handleLinkAckMsg(cMessage *msg);
 
         void sendRoutingInfoMessage(string destinationAddress);
         void sendAckVectorMessage(string destinationAddress);

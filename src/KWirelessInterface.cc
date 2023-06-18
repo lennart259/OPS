@@ -365,6 +365,11 @@ string KWirelessInterface::getDestinationAddress(cMessage *msg)
         return routingInfoMsg->getDestinationAddress();
     }
 
+    KLinkLayerAckMsg *linkLayerAckMsg = dynamic_cast<KLinkLayerAckMsg*>(msg);
+    if (linkLayerAckMsg) {
+        return linkLayerAckMsg->getDestinationAddress();
+    }
+
     KAckMsg *ackMsg = dynamic_cast<KAckMsg*>(msg);
     if (ackMsg) {
         return ackMsg->getDestinationAddress();

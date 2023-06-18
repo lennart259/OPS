@@ -37,6 +37,8 @@ void KMaxPropRoutingLayer::initialize(int stage)
         double bandwidthBitRate = getParentModule()->getSubmodule("link")->par("bandwidthBitRate");
         TimePerPacket = (dataSizeInBytes+wirelessHeaderSize)/bandwidthBitRate*8;
 
+        numPacketsTransmitted = 0;
+        numTransmissions = 0;
 
 
         syncedNeighbourListIHasChanged = TRUE;
@@ -164,6 +166,10 @@ void KMaxPropRoutingLayer::handleMessage(cMessage *msg)
         } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KAckMsg*>(msg) != NULL) {
 
             handleAckMsgFromLowerLayer(msg);
+
+        } else if (strstr(gateName, "lowerLayerIn") != NULL && dynamic_cast<KLinkLayerAckMsg*>(msg) != NULL){
+
+            handleLinkAckMsg(msg);
 
         // received some unexpected packet
         } else {
@@ -493,7 +499,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
         if (syncWithNeighbour) {
             if (syncedNeighbour->sendRoutingNext){
                 // phase 2:
-                // todo send routing info and Ack messages
+                // send routing info and Ack messages
                 EV << ownMACAddress << ": Call sendRoutingInfoMessage from Neighbour handling, send to " << nodeMACAddress << "\n";
                 sendRoutingInfoMessage(nodeMACAddress.c_str());
                 syncedNeighbour->sendRoutingNext = FALSE;
@@ -501,10 +507,20 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             }
             else if (syncedNeighbour->sendDataNext){
                 // phase 3:
-                // todo send data
+                // send data
                 EV << ownMACAddress << ": Send Data to " << nodeMACAddress.c_str() << "\n";
                 sendDataMsgs(nodeMACAddress.c_str());
                 syncedNeighbour->sendDataNext = FALSE;
+            }
+            else if (syncedNeighbour->activeTransmission){
+                // phase 4:
+                // todo send data
+                EV << ownMACAddress << ": connection to " << nodeMACAddress.c_str() << "finished.\n";
+                sendDataMsgs(nodeMACAddress.c_str());
+                syncedNeighbour->activeTransmission = FALSE;
+                numPacketsTransmitted += syncedNeighbour->packetsTransmitted;
+                numTransmissions += 1;
+
             }
             else{
                 // set the cooloff period
@@ -518,6 +534,8 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 syncedNeighbour->neighbourSyncEndTime = 0.0;
                 syncedNeighbour->sendRoutingNext = TRUE;
                 syncedNeighbour->sendDataNext = FALSE;
+                syncedNeighbour->activeTransmission = FALSE;
+                syncedNeighbour->packetsTransmitted = 0;
 
                 // // send summary vector (to start syncing)
 
@@ -570,6 +588,13 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + TimePerPacket;
     syncedNeighbour->neighbourSyncing = TRUE;
     EV << ownMACAddress << ": Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
+
+    // todo: send link ACK back
+    KLinkLayerAckMsg *linkAckMsg = new KLinkLayerAckMsg();
+
+    linkAckMsg->setSourceAddress(ownMACAddress.c_str());
+    linkAckMsg->setDestinationAddress(nodeBMacAddress.c_str());
+    send(linkAckMsg, "lowerLayerOut");
 
     // increment the travelled hop count
     omnetDataMsg->setHopsTravelled(omnetDataMsg->getHopsTravelled() + 1);
@@ -1209,6 +1234,10 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
 
     // TODO HOW DO WE COMPUTE THE THRESH?
     int thresh = cacheList.size()/2;
+    if (numTransmissions>=1){
+        thresh = int(numPacketsTransmitted/numTransmissions);
+        EV << ownMACAddress << ": buffer threshold: " << thresh << "\n";
+    }
 
     switch(mode) {
     case 0: // sort only by hopcount
@@ -1410,6 +1439,19 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
     }
     return sentMessages;
 }
+
+void KMaxPropRoutingLayer::handleLinkAckMsg(cMessage *msg){
+    KLinkLayerAckMsg *linkAckMsg = dynamic_cast<KLinkLayerAckMsg*>(msg);
+    string nodeBMacAddress = linkAckMsg->getSourceAddress();
+    SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress);
+    syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + TimePerPacket;
+    syncedNeighbour->neighbourSyncing = TRUE;
+    syncedNeighbour->activeTransmission = TRUE;
+    syncedNeighbour->packetsTransmitted += 1;
+
+    delete msg;
+}
+
 
 /*********************createAndSendDataMessage()***********************
  * Creates an omnet dataMsg from a cache entry and sends it to lower layer/ destination address
