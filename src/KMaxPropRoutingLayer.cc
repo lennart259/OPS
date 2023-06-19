@@ -264,8 +264,8 @@ void KMaxPropRoutingLayer::handleAppRegistrationMsg(cMessage *msg)
  * is called, when the app generates a new datamessage for itself.
  * function checks, wether the message already exists in cache.
  * if not, new message is appended.
- * if cache size now exceeds maxCacheSize: delete oldest msg.
- * TODO: implement actual caching policy that is: sort messages according to maxprop protocol and then delete last msgs
+ * if cache size now exceeds maxCacheSize: delete oldest msg or last msg in cache
+ *
  *
  */
 void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
@@ -289,31 +289,10 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
     if (!found) {
 
         // apply caching policy if limited cache and cache is full
-        // TODO: implement caching policy function and replace this code (see also todo above in function description)
         if (maximumCacheSize != 0
                 && (currentCacheSize + omnetDataMsg->getRealPayloadSize()) > maximumCacheSize
                 && cacheList.size() > 0) {
-            iteratorCache = cacheList.begin();
-            CacheEntry *removingCacheEntry = *iteratorCache;
-            iteratorCache = cacheList.begin();
-            while (iteratorCache != cacheList.end()) {
-                cacheEntry = *iteratorCache;
-                if (cacheEntry->validUntilTime < removingCacheEntry->validUntilTime) {
-                    removingCacheEntry = cacheEntry;
-                }
-                iteratorCache++;
-            }
-            currentCacheSize -= removingCacheEntry->realPayloadSize;
-
-            emit(cacheBytesRemovedSignal, removingCacheEntry->realPayloadSize);
-            emit(currentCacheSizeBytesSignal, currentCacheSize);
-            emit(currentCacheSizeReportedCountSignal, (int) 1);
-
-            emit(currentCacheSizeBytesSignal2, currentCacheSize);
-
-            cacheList.remove(removingCacheEntry);
-            delete removingCacheEntry;
-
+            applyCachingPolicy(1);
         }
 
         cacheEntry = new CacheEntry;
@@ -608,27 +587,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
             if (maximumCacheSize != 0
                 && (currentCacheSize + omnetDataMsg->getRealPayloadSize()) > maximumCacheSize
                 && cacheList.size() > 0) {
-                iteratorCache = cacheList.begin();
-                CacheEntry *removingCacheEntry = *iteratorCache;
-                iteratorCache = cacheList.begin();
-                while (iteratorCache != cacheList.end()) {
-                    cacheEntry = *iteratorCache;
-                    if (cacheEntry->validUntilTime < removingCacheEntry->validUntilTime) {
-                        removingCacheEntry = cacheEntry;
-                    }
-                    iteratorCache++;
-                }
-                currentCacheSize -= removingCacheEntry->realPayloadSize;
-
-                emit(cacheBytesRemovedSignal, removingCacheEntry->realPayloadSize);
-                emit(currentCacheSizeBytesSignal, currentCacheSize);
-                emit(currentCacheSizeReportedCountSignal, (int) 1);
-
-                emit(currentCacheSizeBytesSignal2, currentCacheSize);
-
-                cacheList.remove(removingCacheEntry);
-
-                delete removingCacheEntry;
+                applyCachingPolicy(1);
             }
 
             cacheEntry = new CacheEntry;
@@ -739,6 +698,41 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     }
 }
 
+void KMaxPropRoutingLayer::applyCachingPolicy(int mode){
+    list<CacheEntry*>::iterator iteratorCache;
+    switch (mode){
+    case 0: // just delete oldest cache Entry
+        iteratorCache = cacheList.begin();
+        CacheEntry *cacheEntry;
+        CacheEntry *removingCacheEntry;
+        removingCacheEntry = *iteratorCache;
+        iteratorCache = cacheList.begin();
+        while (iteratorCache != cacheList.end()) {
+           cacheEntry = *iteratorCache;
+           if (cacheEntry->validUntilTime < removingCacheEntry->validUntilTime) {
+               removingCacheEntry = cacheEntry;
+           }
+           iteratorCache++;
+        }
+        currentCacheSize -= removingCacheEntry->realPayloadSize;
+
+        emit(cacheBytesRemovedSignal, removingCacheEntry->realPayloadSize);
+        emit(currentCacheSizeBytesSignal, currentCacheSize);
+        emit(currentCacheSizeReportedCountSignal, (int) 1);
+        emit(currentCacheSizeBytesSignal2, currentCacheSize);
+
+        cacheList.remove(removingCacheEntry);
+
+        delete removingCacheEntry;
+        break;
+
+    case 1: // assume cache is sorted and delete last cache entry
+        iteratorCache = prev(cacheList.end());
+        cacheList.erase(iteratorCache);
+        break;
+    }
+
+}
 
 /* ********************handleAckMsgFromLowerLayer()**************************
  *
