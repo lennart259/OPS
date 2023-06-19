@@ -40,6 +40,9 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
 		// number of hops to propagate an ACK before it is deleted.
 		int ackTtl = default(maximumHopCount);
 		
+		// Modes 0: hopcount only, 1: pathcost only, 2: both with dynamic thres
+		int sortingMode = default(2);
+		
         // icon used
         @display("i=block/transport");
 

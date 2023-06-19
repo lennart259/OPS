@@ -29,6 +29,7 @@ void KMaxPropRoutingLayer::initialize(int stage)
         usedRNG = par("usedRNG");
         cacheSizeReportingFrequency = par("cacheSizeReportingFrequency");
         numEventsHandled = 0;
+        sortingMode = par("sortingMode");
         //TimePerPacket = par("TimePerPacket");
         ackTtl = par("ackTtl");
 
@@ -36,9 +37,10 @@ void KMaxPropRoutingLayer::initialize(int stage)
         int wirelessHeaderSize = getParentModule()->getSubmodule("link")->par("wirelessHeaderSize");
         double bandwidthBitRate = getParentModule()->getSubmodule("link")->par("bandwidthBitRate");
         TimePerPacket = (dataSizeInBytes+wirelessHeaderSize)/bandwidthBitRate*8;
+        maxNumPacketsInBuffer = maximumCacheSize/dataSizeInBytes;
 
         numPacketsTransmitted = 0;
-        numTransmissions = 0;
+        numTransmissionOpportunities = 0;
 
 
         syncedNeighbourListIHasChanged = TRUE;
@@ -399,32 +401,6 @@ int KMaxPropRoutingLayer::macAddressToNodeIndex(string macAddress){
  */
 void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 {
-    // todo LEN TEST
-    // generate a dummy routing info
-    string macAdresses[] = {"AAA", "BBB", "CCC"};
-    list<PeerLikelihood*> peerLikelihoodList;
-    for(int i = 0; i < 3; i++) {
-        PeerLikelihood *pL = new PeerLikelihood();
-        pL->nodeMACAddress = macAdresses[i];
-        pL->likelihood = i;
-        peerLikelihoodList.push_back(pL);
-    }
-
-
-    KRoutingInfoMsg *routingInfoMsg = new KRoutingInfoMsg();
-    routingInfoMsg->setPeerLikelihoodsArraySize(3);
-
-    list<PeerLikelihood*>::iterator iteratorPLList;
-    int i = 0;
-    iteratorPLList = peerLikelihoodList.begin();
-    while (iteratorPLList != peerLikelihoodList.end()) {
-        PeerLikelihood PL = **iteratorPLList;
-        routingInfoMsg->setPeerLikelihoods(i, PL);
-        iteratorPLList++;
-        i++;
-    }
-
-
     KNeighbourListMsg *neighListMsg = dynamic_cast<KNeighbourListMsg*>(msg);
 
     // if no neighbours or cache is empty, just return
@@ -442,18 +418,10 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
     }
 
     // send summary vector messages (if appropriate) to all nodes to sync in a loop
-    i = 0;
+    int i = 0;
     EV << "neighbors: " << neighListMsg->getNeighbourNameListArraySize() << "\n";
     while (i < neighListMsg->getNeighbourNameListArraySize()) {
         string nodeMACAddress = neighListMsg->getNeighbourNameList(i);
-
-
-        /*// routing info message test
-        routingInfoMsg->setSourceAddress(ownMACAddress.c_str());
-        routingInfoMsg->setDestinationAddress(nodeMACAddress.c_str());
-        send(routingInfoMsg, "lowerLayerOut");
-
-         */
         EV << ownMACAddress << " / nodeIndex " << ownNodeIndex << " is looking at Neighbour : " << nodeMACAddress.c_str() << "\n";
         // get syncing info of neighbor
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeMACAddress);
@@ -462,7 +430,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
         syncedNeighbour->nodeConsidered = TRUE;
 
         bool syncWithNeighbour = FALSE;
-        bool isInSync = syncedNeighbour->sendRoutingNext || syncedNeighbour->sendDataNext;
+        bool isInSync = syncedNeighbour->sendRoutingNext || syncedNeighbour->sendDataNext || syncedNeighbour->activeTransmission;
 
         if (syncedNeighbour->syncCoolOffEndTime >= simTime().dbl() && not isInSync) {
             // if the sync was done recently, don't sync again until the anti-entropy interval
@@ -514,18 +482,18 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
             }
             else if (syncedNeighbour->activeTransmission){
                 // phase 4:
-                // todo send data
-                EV << ownMACAddress << ": connection to " << nodeMACAddress.c_str() << "finished.\n";
-                sendDataMsgs(nodeMACAddress.c_str());
+                // count transmissions
+                EV << ownMACAddress << ": connection to " << nodeMACAddress.c_str() << " finished.\n";
                 syncedNeighbour->activeTransmission = FALSE;
                 numPacketsTransmitted += syncedNeighbour->packetsTransmitted;
-                numTransmissions += 1;
+                syncedNeighbour->packetsTransmitted = 0;
 
             }
             else{
                 // set the cooloff period
                 syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
                 EV << "Reset CoolOffEndTime next reset: " << syncedNeighbour->syncCoolOffEndTime << "\n";
+                numTransmissionOpportunities += 1;
 
                 // initialize all other checks
                 syncedNeighbour->randomBackoffStarted = FALSE;
@@ -589,7 +557,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     syncedNeighbour->neighbourSyncing = TRUE;
     EV << ownMACAddress << ": Set neighbourSyncEndTime next Part: " << syncedNeighbour->neighbourSyncEndTime << "\n";
 
-    // todo: send link ACK back
+    // send link ACK back
     KLinkLayerAckMsg *linkAckMsg = new KLinkLayerAckMsg();
 
     linkAckMsg->setSourceAddress(ownMACAddress.c_str());
@@ -1234,9 +1202,13 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
 
     // TODO HOW DO WE COMPUTE THE THRESH?
     int thresh = cacheList.size()/2;
-    if (numTransmissions>=1){
-        thresh = int(numPacketsTransmitted/numTransmissions);
+    if (numTransmissionOpportunities>=1){
+        int avePacketsPerOpportunity = numPacketsTransmitted/numTransmissionOpportunities;
+        thresh = std::max(std::min(avePacketsPerOpportunity,maxNumPacketsInBuffer-avePacketsPerOpportunity),0);
         EV << ownMACAddress << ": buffer threshold: " << thresh << "\n";
+        EV << ownMACAddress << ": avePacketsPerOpportunity: " << avePacketsPerOpportunity << "\n";
+        EV << ownMACAddress << ": numPacketsTransmitted: " << numPacketsTransmitted << "\n";
+        EV << ownMACAddress << ": numTransmissionOpportunities: " << numTransmissionOpportunities << "\n";
     }
 
     switch(mode) {
@@ -1290,6 +1262,8 @@ KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbour
         syncedNeighbour->nodeConsidered = FALSE;
         syncedNeighbour->sendRoutingNext = FALSE;
         syncedNeighbour->sendDataNext = FALSE;
+        syncedNeighbour->activeTransmission = FALSE;
+        syncedNeighbour->packetsTransmitted = 0;
 
         syncedNeighbourList.push_back(syncedNeighbour);
     }
@@ -1353,7 +1327,7 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 
     // sort Buffer
     EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
-    sortBuffer(2);   // 0: sort by hopcount
+    sortBuffer(sortingMode);
 
 
     // iterate through the whole cacheList

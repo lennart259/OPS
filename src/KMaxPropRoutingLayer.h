@@ -48,7 +48,9 @@ class KMaxPropRoutingLayer : public cSimpleModule
         int usedRNG;
         double cacheSizeReportingFrequency;
         double TimePerPacket;
+        int maxNumPacketsInBuffer;
         int ackHopsToLive;
+        int sortingMode;
 
         int ackTtl;
 
@@ -56,7 +58,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
         int currentCacheSize;
 
         int numPacketsTransmitted;
-        int numTransmissions;
+        int numTransmissionOpportunities;
 
         cMessage *cacheSizeReportingTimeoutEvent;
 
