@@ -62,6 +62,7 @@ network OPSNetwork
         @statistic[fwdDPTableDataBytesReceived](source=sum(fwdDPTableDataBytesReceived); record=last,vector; title="DP Table Data Received"; unit=byte);
         @statistic[fwdTotalBytesReceived](source=sum(fwdTotalBytesReceived); record=last,vector; title="Total Received"; unit=byte);
         @statistic[fwdAvgHopsTravelled](source=sum(fwdHopsTravelled)/sum(fwdHopsTravelledCount); record=last,vector; title="Average Hops Travelled");
+        @statistic[fwdCacheBytesRemovedByAck](source=sum(fwdCacheBytesRemovedByAck); record=last,vector; title="Cache Removals by ACK"; unit=byte);
         @statistic[fwdCacheBytesRemoved](source=sum(fwdCacheBytesRemoved); record=last,vector; title="Cache Removals"; unit=byte);
         @statistic[fwdCacheBytesAdded](source=sum(fwdCacheBytesAdded); record=last,vector; title="Cache Additions"; unit=byte);
         @statistic[fwdCacheBytesUpdated](source=sum(fwdCacheBytesUpdated); record=last,vector; title="Cache Updates"; unit=byte);
@@ -76,7 +77,8 @@ network OPSNetwork
         @statistic[fwdDPTableRequestBytesSent](source=sum(fwdDPTableRequestBytesSent); record=last,vector; title="DP Table Requests Sent"; unit=byte);
         @statistic[fwdDPTableDataBytesSent](source=sum(fwdDPTableDataBytesSent); record=last,vector; title="DP Table Data Sent"; unit=byte);
         @statistic[fwdTotalBytesSent](source=sum(fwdTotalBytesSent); record=last,vector; title="Total Sent"; unit=byte);
-
+		@statistic[fwdRcvDuplicateMsgs](source=sum(fwdRcvDuplicateMsgs); record=last,vector; title="Number of received Duplicates"; unit=byte);
+		
         // statistics
         // from link layer
         @statistic[linkAvgNeighbourSize](source=sum(linkNeighSize)/sum(linkNeighSizeCount); record=last,vector; title="Average Neighbour Size");

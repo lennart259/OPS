@@ -89,6 +89,8 @@ void KMaxPropRoutingLayer::initialize(int stage)
         dataReqBytesSentSignal = registerSignal("fwdDataReqBytesSent");
         totalBytesSentSignal = registerSignal("fwdTotalBytesSent");
 
+        receivedDuplicateMsgs = registerSignal("fwdRcvDuplicateMsgs");
+
     } else {
         EV_FATAL << KMAXPROPROUTINGLAYER_SIMMODULEINFO << "Something is radically wrong in initialization \n";
     }
@@ -543,6 +545,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
     linkAckMsg->setDestinationAddress(nodeBMacAddress.c_str());
     send(linkAckMsg, "lowerLayerOut");
 
+    EV << ownMACAddress << " sending LinkAck to " << nodeBMacAddress << "\n";
     // increment the travelled hop count
     omnetDataMsg->setHopsTravelled(omnetDataMsg->getHopsTravelled() + 1);
     omnetDataMsg->setHopCount(omnetDataMsg->getHopCount() + 1);
@@ -559,9 +562,13 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 
     ///Fix 1: if this node is the destination, no caching, data passed directly to app layer
     if ((omnetDataMsg->getDestinationOriented() && strstr(ownMACAddress.c_str(), omnetDataMsg->getFinalDestinationAddress()) != NULL) || omnetDataMsg->getHopCount() >= maximumHopCount) {
-    //if (omnetDataMsg->getHopCount() >= maximumHopCount) {
-
         cacheData = FALSE;
+        if(omnetDataMsg->getHopCount() >= maximumHopCount){
+            EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << " and deleting, because maxHopCount is exceeded.\n";
+        }
+        else {
+            EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << " and we are finalDestination.\n";
+        }
     }
 
     if(cacheData) {
@@ -633,6 +640,10 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
              currentCacheSize += cacheEntry->realPayloadSize;
 
         }
+        else {
+            EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << " and we already have it in our cache...\n";
+            emit(receivedDuplicateMsgs, 1);
+        }
 
         cacheEntry->hopsTravelled = omnetDataMsg->getHopsTravelled();
         cacheEntry->hopCount = omnetDataMsg->getHopCount();
@@ -694,6 +705,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 
 
     } else {
+        EV << ownMACAddress << ": App not found? \n";
         delete msg;
     }
 }
@@ -1416,6 +1428,7 @@ void KMaxPropRoutingLayer::handleLinkAckMsg(cMessage *msg){
     syncedNeighbour->neighbourSyncing = TRUE;
     syncedNeighbour->activeTransmission = TRUE;
     syncedNeighbour->packetsTransmitted += 1;
+    EV << ownMACAddress << ": received LinkAck from " << nodeBMacAddress << "\n";
 
     delete msg;
 }

@@ -211,6 +211,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         simsignal_t dataReqBytesSentSignal;
         simsignal_t totalBytesSentSignal;
 
+        simsignal_t receivedDuplicateMsgs;
+
 };
 
 #define KMAXPROPROUTINGLAYER_SIMMODULEINFO         " KMaxPropRoutingLayer>!<" << simTime() << ">!<" << getParentModule()->getFullName()
