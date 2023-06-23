@@ -23,7 +23,7 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
         double antiEntropyInterval @unit(s) = default(300s);
 
         // maximum amount of hops to forward for a data
-        int maximumHopCount = default(25);
+        int maximumHopCount = default(100);
 
         // maximum duration to use when obtaining a random backoff duration
         double maximumRandomBackoffDuration @unit(s) = default(5s);
@@ -67,6 +67,8 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
         @signal[fwdSumVecBytesSent](type=long);
         @signal[fwdDataReqBytesSent](type=long);
         @signal[fwdTotalBytesSent](type=long);
+        
+        @signal[fwdRcvDuplicateMsgs](type=long);
 
     gates:
 
