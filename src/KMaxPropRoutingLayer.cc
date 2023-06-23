@@ -452,6 +452,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 EV << ownMACAddress << ": Call sendRoutingInfoMessage from Neighbour handling, send to " << nodeMACAddress << "\n";
                 sendRoutingInfoMessage(nodeMACAddress.c_str());
                 syncedNeighbour->sendRoutingNext = FALSE;
+                syncedNeighbour->sendACKNext = TRUE;
                 // syncedNeighbour->sendDataNext = TRUE;
             }
             else if (syncedNeighbour->sendDataNext){
@@ -461,6 +462,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 sendDataMsgs(nodeMACAddress.c_str());
                 syncedNeighbour->sendDataNext = FALSE;
             }
+            /*
             else if (syncedNeighbour->activeTransmission){
                 // phase 4:
                 // count transmissions
@@ -468,13 +470,12 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 syncedNeighbour->activeTransmission = FALSE;
                 numPacketsTransmitted += syncedNeighbour->packetsTransmitted;
                 syncedNeighbour->packetsTransmitted = 0;
-
             }
+            */
             else{
                 // set the cooloff period
                 syncedNeighbour->syncCoolOffEndTime = simTime().dbl() + antiEntropyInterval;
                 EV << "Reset CoolOffEndTime next reset: " << syncedNeighbour->syncCoolOffEndTime << "\n";
-                numTransmissionOpportunities += 1;
 
                 // initialize all other checks
                 syncedNeighbour->randomBackoffStarted = FALSE;
@@ -482,6 +483,7 @@ void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
                 syncedNeighbour->neighbourSyncing = FALSE;
                 syncedNeighbour->neighbourSyncEndTime = 0.0;
                 syncedNeighbour->sendRoutingNext = TRUE;
+                syncedNeighbour->sendACKNext = FALSE;
                 syncedNeighbour->sendDataNext = FALSE;
                 syncedNeighbour->activeTransmission = FALSE;
                 syncedNeighbour->packetsTransmitted = 0;
@@ -839,11 +841,12 @@ void KMaxPropRoutingLayer::handleAckMsgFromLowerLayer(cMessage *msg)
         sendDataMsgs(nodeBMacAddress.c_str());
         syncedNeighbour->sendDataNext = FALSE;
     }
-    else{
+    else if (syncedNeighbour->sendACKNext){
         // routing info is send, but sendDataNext is False
         // -> we did not send Ack Vector so we send it now
         EV << ownMACAddress << ": Call sendAckVectorMessage from handleAckVectorMessage, send to " << nodeBMacAddress << "\n";
         sendAckVectorMessage(nodeBMacAddress.c_str());
+        syncedNeighbour->sendACKNext = FALSE;
         syncedNeighbour->sendDataNext = TRUE;
     }
     delete msg;
@@ -994,11 +997,13 @@ void KMaxPropRoutingLayer::handleRoutingInfoMsgFromLowerLayer(cMessage *msg) {
         EV << ownMACAddress << ": Call sendRoutingInfoMessage from handleRoutingInfoMessage, send to " << nodeBMacAddress << "\n";
         sendRoutingInfoMessage(nodeBMacAddress.c_str());
         syncedNeighbour->sendRoutingNext = FALSE;
+        syncedNeighbour->sendACKNext = TRUE;
     }
-    else{
+    else if (syncedNeighbour->sendACKNext){
         //
         EV << ownMACAddress << ": Call sendAckVectorMessage from handleRoutingInfoMessage, send to " << nodeBMacAddress << "\n";
         sendAckVectorMessage(nodeBMacAddress.c_str());
+        syncedNeighbour->sendACKNext = FALSE;
         syncedNeighbour->sendDataNext = TRUE;
     }
 
@@ -1267,6 +1272,7 @@ KMaxPropRoutingLayer::SyncedNeighbour* KMaxPropRoutingLayer::getSyncingNeighbour
         syncedNeighbour->neighbourSyncEndTime = 0.0;
         syncedNeighbour->nodeConsidered = FALSE;
         syncedNeighbour->sendRoutingNext = FALSE;
+        syncedNeighbour->sendACKNext = FALSE;
         syncedNeighbour->sendDataNext = FALSE;
         syncedNeighbour->activeTransmission = FALSE;
         syncedNeighbour->packetsTransmitted = 0;
@@ -1330,6 +1336,8 @@ void KMaxPropRoutingLayer::sendDataMsgs(string destinationAddress)
 {
     // compute and store pathCosts for all messages in buffer for the current neighbor
     computePathCostsToFinalDest(macAddressToNodeIndex(destinationAddress));
+    // new transmission opportunity
+    numTransmissionOpportunities += 1;
 
     // sort Buffer
     EV << ownMACAddress << ": sendDataMsgs(): Sorting Buffer \n";
@@ -1424,11 +1432,14 @@ void KMaxPropRoutingLayer::handleLinkAckMsg(cMessage *msg){
     KLinkLayerAckMsg *linkAckMsg = dynamic_cast<KLinkLayerAckMsg*>(msg);
     if (strstr(linkAckMsg->getDestinationAddress(),ownMACAddress.c_str())!=NULL){
         string nodeBMacAddress = linkAckMsg->getSourceAddress();
+        numPacketsTransmitted += 1;
+        /*
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress);
         syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + TimePerPacket;
         syncedNeighbour->neighbourSyncing = TRUE;
         syncedNeighbour->activeTransmission = TRUE;
         syncedNeighbour->packetsTransmitted += 1;
+        */
     }
     delete msg;
 }

@@ -112,6 +112,7 @@ class KMaxPropRoutingLayer : public cSimpleModule
             double neighbourSyncEndTime;
 
             bool sendRoutingNext;
+            bool sendACKNext;
             bool sendDataNext;
 
             bool activeTransmission;
