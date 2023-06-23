@@ -1422,7 +1422,7 @@ int KMaxPropRoutingLayer::sendDataDestinedToNeighbor(string destinationAddress)
 
 void KMaxPropRoutingLayer::handleLinkAckMsg(cMessage *msg){
     KLinkLayerAckMsg *linkAckMsg = dynamic_cast<KLinkLayerAckMsg*>(msg);
-    if (strstr(linkAckMsg->getDestinationAddress(),ownMACAddress)!=NULL){
+    if (strstr(linkAckMsg->getDestinationAddress(),ownMACAddress.c_str())!=NULL){
         string nodeBMacAddress = linkAckMsg->getSourceAddress();
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress);
         syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + TimePerPacket;
