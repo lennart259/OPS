@@ -1218,6 +1218,7 @@ void KMaxPropRoutingLayer::sortBuffer(int mode){
         thresh = std::max(std::min(avePacketsPerOpportunity,maxNumPacketsInBuffer-avePacketsPerOpportunity),0);
         EV << ownMACAddress << ": buffer threshold: " << thresh << "\n";
         EV << ownMACAddress << ": avePacketsPerOpportunity: " << avePacketsPerOpportunity << "\n";
+        EV << ownMACAddress << ": current cache size: " << cacheList.size() << "\n";
         EV << ownMACAddress << ": numPacketsTransmitted: " << numPacketsTransmitted << "\n";
         EV << ownMACAddress << ": numTransmissionOpportunities: " << numTransmissionOpportunities << "\n";
     }
