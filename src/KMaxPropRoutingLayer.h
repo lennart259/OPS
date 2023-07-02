@@ -12,7 +12,7 @@
 
 #define TRUE                            1
 #define FALSE                           0
-#define NUM_NODES   100
+#define NUM_NODES   200
 
 #include <omnetpp.h>
 #include <cstdlib>
