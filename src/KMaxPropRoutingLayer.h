@@ -12,7 +12,7 @@
 
 #define TRUE                            1
 #define FALSE                           0
-#define NUM_NODES   200
+#define NUM_NODES   20
 
 #include <omnetpp.h>
 #include <cstdlib>
@@ -213,6 +213,8 @@ class KMaxPropRoutingLayer : public cSimpleModule
         simsignal_t totalBytesSentSignal;
 
         simsignal_t receivedDuplicateMsgs;
+        simsignal_t receivedCachableMsgs;
+        simsignal_t receivedDeletableDueToTTL;
 
 };
 

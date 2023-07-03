@@ -90,6 +90,8 @@ void KMaxPropRoutingLayer::initialize(int stage)
         totalBytesSentSignal = registerSignal("fwdTotalBytesSent");
 
         receivedDuplicateMsgs = registerSignal("fwdRcvDuplicateMsgs");
+        receivedCachableMsgs = registerSignal("fwdRcvCachableMsgs");
+        receivedDeletableDueToTTL = registerSignal("fwdRcvDeletableDueToTTL");
 
     } else {
         EV_FATAL << KMAXPROPROUTINGLAYER_SIMMODULEINFO << "Something is radically wrong in initialization \n";
@@ -321,6 +323,8 @@ void KMaxPropRoutingLayer::handleDataMsgFromUpperLayer(cMessage *msg)
         cacheEntry->createdTime = simTime().dbl();
         cacheEntry->updatedTime = simTime().dbl();
 
+        cacheEntry->hopList.push_back(macAddressToNodeIndex(ownMACAddress));
+
         cacheList.push_back(cacheEntry);
 
         currentCacheSize += cacheEntry->realPayloadSize;
@@ -545,6 +549,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 
     linkAckMsg->setSourceAddress(ownMACAddress.c_str());
     linkAckMsg->setDestinationAddress(nodeBMacAddress.c_str());
+    linkAckMsg->setMsgUniqueId(omnetDataMsg->getMsgUniqueID());
     send(linkAckMsg, "lowerLayerOut");
 
     EV << ownMACAddress << " sending LinkAck to " << nodeBMacAddress << "\n";
@@ -567,6 +572,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
         cacheData = FALSE;
         if(omnetDataMsg->getHopCount() >= maximumHopCount){
             EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << " and deleting, because maxHopCount is exceeded.\n";
+            emit(receivedDeletableDueToTTL, 1);
         }
         else {
             EV << ownMACAddress << ": received Data from " << omnetDataMsg->getSourceAddress() << " and we are finalDestination.\n";
@@ -633,13 +639,14 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
                  EV << "Entry " << i << ": " << hopIndex << "\n";
                  i++;
              }
-             // add last hop (source MAC) to hopList
-             cacheEntry->hopList.push_back(macAddressToNodeIndex(omnetDataMsg->getSourceAddress()));
-             EV << "Newest Entry " << (i) << ": " << macAddressToNodeIndex(omnetDataMsg->getSourceAddress()) << " added to message " << omnetDataMsg->getMsgUniqueID() << "\n";
+             // add our own MAC to hopList
+             cacheEntry->hopList.push_back(macAddressToNodeIndex(ownMACAddress));
+             //EV << "Newest Entry " << (i) << ": " << macAddressToNodeIndex(omnetDataMsg->getSourceAddress()) << " added to message " << omnetDataMsg->getMsgUniqueID() << "\n";
 
              cacheList.push_back(cacheEntry);
 
              currentCacheSize += cacheEntry->realPayloadSize;
+             emit(receivedCachableMsgs, 1);
 
         }
         else {
@@ -707,7 +714,7 @@ void KMaxPropRoutingLayer::handleDataMsgFromLowerLayer(cMessage *msg)
 
 
     } else {
-        EV << ownMACAddress << ": App not found? \n";
+        //EV << ownMACAddress << ": App not found? \n";
         delete msg;
     }
 }
@@ -1434,6 +1441,25 @@ void KMaxPropRoutingLayer::handleLinkAckMsg(cMessage *msg){
     if (strstr(linkAckMsg->getDestinationAddress(),ownMACAddress.c_str())!=NULL){
         string nodeBMacAddress = linkAckMsg->getSourceAddress();
         numPacketsTransmitted += 1;
+
+        // find ack'd message in cache
+
+        CacheEntry *cacheEntry;
+        list<CacheEntry*>::iterator iteratorCache;
+        bool found = FALSE;
+        iteratorCache = cacheList.begin();
+        while (iteratorCache != cacheList.end()) {
+            cacheEntry = *iteratorCache;
+            if(cacheEntry->msgUniqueID == linkAckMsg->getMsgUniqueId()) {
+                found = TRUE;
+                break;
+            }
+            iteratorCache++;
+        }
+        if(found) { // add msg recipient (ack source address) to hop list of that message
+            cacheEntry->hopList.push_back(macAddressToNodeIndex(nodeBMacAddress));
+        }
+
         /*
         SyncedNeighbour *syncedNeighbour = getSyncingNeighbourInfo(nodeBMacAddress);
         syncedNeighbour->neighbourSyncEndTime = simTime().dbl() + TimePerPacket;

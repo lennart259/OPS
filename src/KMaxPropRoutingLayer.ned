@@ -69,6 +69,10 @@ simple KMaxPropRoutingLayer like IOPSForwardingLayer
         @signal[fwdTotalBytesSent](type=long);
         
         @signal[fwdRcvDuplicateMsgs](type=long);
+        @signal[fwdRcvCachableMsgs](type=long);
+        @signal[fwdRcvDeletableDueToTTL](type=long);
+        
+        
 
     gates:
 

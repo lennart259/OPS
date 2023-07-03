@@ -78,6 +78,10 @@ network OPSNetwork
         @statistic[fwdDPTableDataBytesSent](source=sum(fwdDPTableDataBytesSent); record=last,vector; title="DP Table Data Sent"; unit=byte);
         @statistic[fwdTotalBytesSent](source=sum(fwdTotalBytesSent); record=last,vector; title="Total Sent"; unit=byte);
 		@statistic[fwdRcvDuplicateMsgs](source=sum(fwdRcvDuplicateMsgs); record=last,vector; title="Number of received Duplicates"; unit=byte);
+		@statistic[fwdRcvCachableMsgs](source=sum(fwdRcvCachableMsgs); record=last,vector; title="Number of received Messages stored in Cache"; unit=byte);
+		@statistic[fwdRcvDeletableDueToTTL](source=sum(fwdRcvDeletableDueToTTL); record=last,vector; title="Number of messages deleted due to expired ttl"; unit=byte);
+		
+		
 		
         // statistics
         // from link layer

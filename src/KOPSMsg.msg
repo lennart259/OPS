@@ -141,6 +141,8 @@ packet KLinkLayerAckMsg {
     // common fields
     string sourceAddress;
     string destinationAddress;
+    
+    int msgUniqueId; 
 }
 //
 // Routing Info message (used with MaxProp Routing).
