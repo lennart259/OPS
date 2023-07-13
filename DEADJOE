@@ -154,3 +154,6 @@ Processing '/etc/joe/editorrc'...
 Processing '/etc/joe/ftyperc'...
 Finished processing /etc/joe/ftyperc
 Finished processing /etc/joe/editorrc
+
+*** These modified files were found in JOE when it aborted on Sun Jul  2 22:38:23 2023
+*** JOE was aborted because the terminal closed

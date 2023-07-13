@@ -382,7 +382,6 @@ int KMaxPropRoutingLayer::macAddressToNodeIndex(string macAddress){
  * each time, the function is called, we iterate through the new neighbourlist and determine,
  * if we need to sync with each respective neighbour or not
  *
- * TODO: Julian, sync prozess aendert sich sicher etwas
  */
 void KMaxPropRoutingLayer::handleNeighbourListMsgFromLowerLayer(cMessage *msg)
 {
